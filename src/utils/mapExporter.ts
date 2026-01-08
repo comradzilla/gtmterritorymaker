@@ -31,6 +31,14 @@ export interface MapExportOptions {
   }
   visibleCodes?: string[]
   legendData?: LegendData
+  geoJsonData?: GeoJSON.FeatureCollection
+  repColors?: Record<string, string>
+}
+
+interface PolygonPosition {
+  code: string
+  paths: { x: number; y: number }[][]
+  fillColor: string
 }
 
 /**
@@ -93,14 +101,62 @@ export async function exportMapAsImage(
   map: LeafletMap,
   options: MapExportOptions
 ): Promise<void> {
-  const { format, quality = 0.95, includeLegend, includeLabels = false, filename, visibleCodes, legendData } = options
+  const { format, quality = 0.95, includeLegend, includeLabels = false, filename, visibleCodes, legendData, geoJsonData, repColors } = options
 
   const TIMEOUT_MS = 15000 // 15 seconds
+
+  // Pre-calculate polygon positions for territory shading
+  const polygonPositions: PolygonPosition[] = []
+  const mapSize = map.getSize()
+
+  if (geoJsonData && legendData && repColors) {
+    for (const feature of geoJsonData.features) {
+      const code = (feature.properties as any)?.code
+      if (!code) continue
+
+      const assignment = legendData.assignments[code]
+      if (!assignment) continue // Skip unassigned territories
+
+      const repColor = repColors[assignment.repName.toLowerCase()]
+      if (!repColor) continue
+
+      // Get coordinates based on geometry type
+      const geometry = feature.geometry
+      const coordArrays: number[][][] = []
+
+      if (geometry.type === 'Polygon') {
+        coordArrays.push(...(geometry.coordinates as number[][][]))
+      } else if (geometry.type === 'MultiPolygon') {
+        for (const polygon of geometry.coordinates as number[][][][]) {
+          coordArrays.push(...polygon)
+        }
+      }
+
+      // Convert each ring to pixel positions
+      const paths: { x: number; y: number }[][] = []
+      for (const ring of coordArrays) {
+        const path: { x: number; y: number }[] = []
+        for (const coord of ring) {
+          const point = map.latLngToContainerPoint(L.latLng(coord[1], coord[0]))
+          path.push({ x: point.x, y: point.y })
+        }
+        paths.push(path)
+      }
+
+      if (paths.length > 0) {
+        polygonPositions.push({
+          code,
+          paths,
+          fillColor: repColor,
+        })
+      }
+    }
+    console.log(`Pre-calculated positions for ${polygonPositions.length} territory polygons`)
+  }
 
   // Pre-calculate label positions using Leaflet's projection BEFORE removing markers
   // This gives us accurate pixel positions that match the map's projection
   const labelPositions: LabelPosition[] = []
-  const mapSize = map.getSize()
 
   if (includeLabels && visibleCodes) {
     for (const code of visibleCodes) {
@@ -173,12 +229,20 @@ export async function exportMapAsImage(
     // Get canvas context for drawing overlays
     const ctx = canvas.getContext('2d')!
 
+    // Calculate scale factor between map container and canvas
+    const scaleX = canvas.width / mapSize.x
+    const scaleY = canvas.height / mapSize.y
+
+    // Draw territory polygons FIRST (under labels)
+    if (polygonPositions.length > 0) {
+      console.log('Drawing territory polygons...')
+      drawPolygonsOnCanvas(ctx, polygonPositions, scaleX, scaleY)
+      console.log('Territory polygons drawn')
+    }
+
     // Draw labels if requested using pre-calculated positions
     if (includeLabels && labelPositions.length > 0) {
       console.log('Drawing labels...')
-      // Calculate scale factor between map container and canvas
-      const scaleX = canvas.width / mapSize.x
-      const scaleY = canvas.height / mapSize.y
       drawLabelsOnCanvas(ctx, labelPositions, scaleX, scaleY)
       console.log('Labels drawn')
     }
@@ -262,6 +326,64 @@ function drawLabelsOnCanvas(
     ctx.fillStyle = '#1f2937'
     ctx.fillText(pos.code, x, y)
   }
+}
+
+/**
+ * Draw territory polygons directly onto the canvas
+ */
+function drawPolygonsOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  polygonPositions: PolygonPosition[],
+  scaleX: number,
+  scaleY: number
+): void {
+  for (const polygon of polygonPositions) {
+    ctx.fillStyle = polygon.fillColor
+    ctx.strokeStyle = '#374151' // Border color (gray-700)
+    ctx.lineWidth = Math.max(1, scaleX)
+    ctx.globalAlpha = 0.5 // Match fillOpacity from StateLayer
+
+    for (const path of polygon.paths) {
+      if (path.length < 3) continue
+
+      ctx.beginPath()
+      const startX = path[0].x * scaleX
+      const startY = path[0].y * scaleY
+      ctx.moveTo(startX, startY)
+
+      for (let i = 1; i < path.length; i++) {
+        const x = path[i].x * scaleX
+        const y = path[i].y * scaleY
+        ctx.lineTo(x, y)
+      }
+
+      ctx.closePath()
+      ctx.fill()
+    }
+
+    // Draw borders separately with full opacity
+    ctx.globalAlpha = 1
+    for (const path of polygon.paths) {
+      if (path.length < 3) continue
+
+      ctx.beginPath()
+      const startX = path[0].x * scaleX
+      const startY = path[0].y * scaleY
+      ctx.moveTo(startX, startY)
+
+      for (let i = 1; i < path.length; i++) {
+        const x = path[i].x * scaleX
+        const y = path[i].y * scaleY
+        ctx.lineTo(x, y)
+      }
+
+      ctx.closePath()
+      ctx.stroke()
+    }
+  }
+
+  // Reset alpha
+  ctx.globalAlpha = 1
 }
 
 /**

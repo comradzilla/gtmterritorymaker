@@ -232,6 +232,19 @@ src/
   - Export now works reliably with both labels ON and OFF
   - Build verified clean
 
+### Session 15
+- Fix Territory Colors in Export (Phase 15):
+  - Issue: `leaflet-image` doesn't capture styled GeoJSON layers (territory colors missing in export)
+  - Solution: Draw territory polygons programmatically on canvas, similar to labels
+  - Added `PolygonPosition` interface and `drawPolygonsOnCanvas()` function to mapExporter.ts
+  - Pre-calculate polygon pixel positions using `map.latLngToContainerPoint()` (Mercator projection)
+  - Handle both Polygon and MultiPolygon geometry types
+  - Draw fills with 50% opacity (matching StateLayer) and borders with full opacity
+  - Updated ExportImportToolbar to pass `geoJsonData` and `repColors` to export function
+  - Updated Map.tsx to pass these additional props
+  - Export now shows territory colors correctly
+  - Build verified clean
+
 ---
 
 ## Known Issues

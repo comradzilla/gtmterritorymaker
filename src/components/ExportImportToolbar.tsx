@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import type { TerritoryAssignments } from '../types'
+import type { TerritoryAssignments, StatesGeoJSON, RepColors } from '../types'
 import type { SalesRep } from '../data/reps'
 import {
   exportAssignmentsAsJSON,
@@ -11,6 +11,7 @@ import { exportMapAsImage, type MapExportOptions, type LegendData } from '../uti
 interface ExportImportToolbarProps {
   assignments: TerritoryAssignments
   reps: SalesRep[]
+  repColors: RepColors
   codeToName: Record<string, string>
   onImport: (data: TerritoryAssignments) => void
   onUndo: () => void
@@ -24,11 +25,13 @@ interface ExportImportToolbarProps {
   onToggleLabels: (show: boolean) => void
   showLegend: boolean
   onToggleLegend: (show: boolean) => void
+  geoJsonData: StatesGeoJSON | null
 }
 
 function ExportImportToolbar({
   assignments,
   reps,
+  repColors,
   codeToName,
   onImport,
   onUndo,
@@ -42,6 +45,7 @@ function ExportImportToolbar({
   onToggleLabels,
   showLegend,
   onToggleLegend,
+  geoJsonData,
 }: ExportImportToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false)
@@ -110,6 +114,8 @@ function ExportImportToolbar({
         mapBounds,
         visibleCodes,
         legendData,
+        geoJsonData: geoJsonData || undefined,
+        repColors,
       }
 
       await exportMapAsImage(mapRef.current!, options)

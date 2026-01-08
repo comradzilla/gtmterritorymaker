@@ -143,6 +143,7 @@ function Map() {
       <ExportImportToolbar
         assignments={assignments}
         reps={reps}
+        repColors={repColors}
         codeToName={lookupMaps.codeToName}
         onImport={importAssignments}
         onUndo={undo}
@@ -156,6 +157,7 @@ function Map() {
         onToggleLabels={setShowLabels}
         showLegend={showLegend}
         onToggleLegend={setShowLegend}
+        geoJsonData={data}
       />
 
       {/* State Search */}
