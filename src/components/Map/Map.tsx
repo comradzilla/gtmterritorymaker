@@ -50,6 +50,7 @@ function Map() {
   const [selectedState, setSelectedState] = useState<SelectedState | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(true)
   const [showLabels, setShowLabels] = useState(false)
+  const [showLegend, setShowLegend] = useState(true)
 
   // Refs
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -155,6 +156,8 @@ function Map() {
         legendRef={legendRef}
         showLabels={showLabels}
         onToggleLabels={setShowLabels}
+        showLegend={showLegend}
+        onToggleLegend={setShowLegend}
       />
 
       {/* State Search */}
@@ -209,9 +212,11 @@ function Map() {
       </MapContainer>
 
       {/* Legend */}
-      <div ref={legendRef}>
-        <Legend reps={reps} assignments={assignments} />
-      </div>
+      {showLegend && (
+        <div ref={legendRef}>
+          <Legend reps={reps} assignments={assignments} />
+        </div>
+      )}
 
       {/* Assignment Modal */}
       {selectedState && (

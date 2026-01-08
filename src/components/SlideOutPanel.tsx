@@ -114,6 +114,7 @@ function SlideOutPanel({
       {/* Toggle Button */}
       <button
         onClick={onToggle}
+        data-export-exclude="true"
         className={`fixed top-20 z-[900] bg-white shadow-lg rounded-r-lg p-2 transition-all duration-300 hover:bg-gray-50 border border-l-0 border-gray-200 ${
           isOpen ? 'left-80' : 'left-0'
         }`}
@@ -131,6 +132,7 @@ function SlideOutPanel({
 
       {/* Panel */}
       <div
+        data-export-exclude="true"
         className={`fixed inset-y-0 left-0 w-80 bg-white shadow-xl z-[800] transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}

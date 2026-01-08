@@ -160,7 +160,27 @@ src/
   - Consolidated all exports into single "Export" dropdown (JSON, CSV, PNG, JPEG)
   - Moved Labels toggle into toolbar
   - Removed separate MapExportButton component (merged into toolbar)
-  - Cleaner unified toolbar: `[Undo][Redo] | [Export▼] | [Import] | [Labels] | [+][-] | Save`
+
+### Session 7
+- Legend Toggle + Export Fix (Phase 7):
+  - Added Legend toggle button to toolbar (show/hide legend)
+  - Fixed image export error when labels are on (added skipFonts option to html-to-image)
+  - Updated toolbar: `[Undo][Redo] | [Export▼] | [Import] | [Labels] | [Legend] | [+][-] | Save`
+
+### Session 8
+- Export Bug Fixes (Phase 8):
+  - Fixed dialog appearing in exported screenshot (close dialog BEFORE capture with 100ms delay)
+  - Added additional html-to-image options for label export: `includeQueryParams: false`, `skipAutoScale: true`
+  - Simplified export dialog by removing loading spinner state (no longer needed since dialog closes before export)
+  - Build verified clean with no TypeScript errors
+
+### Session 9
+- Export Cleanup (Phase 9):
+  - Removed export dialog with checkboxes - PNG/JPEG now export directly from dropdown
+  - Export uses current UI state: if legend toggle is on, include legend; if labels toggle is on, include labels
+  - Added `data-export-exclude` attributes to SlideOutPanel (button and container) to hide from export
+  - Added `leaflet-tooltip` filter in mapExporter.ts to exclude hover tooltips from screenshot
+  - Build verified clean
 
 ---
 

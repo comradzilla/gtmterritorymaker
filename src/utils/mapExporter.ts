@@ -23,6 +23,7 @@ export async function exportMapAsImage(
     const className = node.className?.toString() || ''
     if (className.includes('leaflet-control-zoom')) return false
     if (className.includes('leaflet-control-attribution')) return false
+    if (className.includes('leaflet-tooltip')) return false
     if (node.getAttribute?.('data-export-exclude') === 'true') return false
     return true
   }
@@ -36,6 +37,11 @@ export async function exportMapAsImage(
       backgroundColor: '#ffffff',
       quality: format === 'jpeg' ? quality : undefined,
       pixelRatio: 2, // Higher resolution for better quality
+      // Fix for Leaflet DivIcon marker export issues
+      skipFonts: true,
+      fontEmbedCSS: '',
+      includeQueryParams: false,
+      skipAutoScale: true,
     }
 
     let dataUrl = await toImageFn(mapContainer, imageOptions)
