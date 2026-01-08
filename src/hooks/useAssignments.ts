@@ -118,7 +118,10 @@ export function useAssignments(): UseAssignmentsReturn {
       const timestamp = new Date().toISOString()
       const next = { ...history.present }
       codes.forEach((code) => {
-        next[code] = { repName, assignedAt: timestamp }
+        next[code] = {
+          repName,
+          assignedAt: timestamp,
+        }
       })
       pushState(next)
     },

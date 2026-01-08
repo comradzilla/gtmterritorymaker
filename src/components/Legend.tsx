@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { SalesRep } from '../data/reps'
 import type { TerritoryAssignments } from '../types'
 
@@ -7,22 +7,55 @@ interface LegendProps {
   assignments: TerritoryAssignments
 }
 
+interface TerritoryItem {
+  territoryName: string
+  repName: string
+  color: string
+  count: number
+}
+
 function Legend({ reps, assignments }: LegendProps) {
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null)
 
-  // Count territories per rep
-  const territoryCounts = Object.values(assignments).reduce((acc, assignment) => {
-    const repName = assignment.repName.toLowerCase()
-    acc[repName] = (acc[repName] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+  // Build territory summary based on rep.territoryName
+  const { territories, repsWithoutTerritory } = useMemo(() => {
+    // Count assignments per rep
+    const repCounts = new Map<string, number>()
+    Object.values(assignments).forEach((a) => {
+      repCounts.set(a.repName, (repCounts.get(a.repName) || 0) + 1)
+    })
 
-  // Only show reps that have at least one territory assigned
-  const activeReps = reps.filter(
-    (rep) => territoryCounts[rep.name.toLowerCase()] > 0
-  )
+    // Build territory list from reps that have assignments
+    const territories: TerritoryItem[] = []
+    const repsWithoutTerritory: { repName: string; color: string; count: number }[] = []
+
+    reps.forEach((rep) => {
+      const count = repCounts.get(rep.name) || 0
+      if (count === 0) return // Skip reps with no assignments
+
+      if (rep.territoryName) {
+        territories.push({
+          territoryName: rep.territoryName,
+          repName: rep.name,
+          color: rep.color,
+          count,
+        })
+      } else {
+        repsWithoutTerritory.push({
+          repName: rep.name,
+          color: rep.color,
+          count,
+        })
+      }
+    })
+
+    // Sort territories alphabetically
+    territories.sort((a, b) => a.territoryName.localeCompare(b.territoryName))
+
+    return { territories, repsWithoutTerritory }
+  }, [assignments, reps])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Don't start drag if clicking inside the legend content area (allow text selection)
@@ -71,7 +104,9 @@ function Legend({ reps, assignments }: LegendProps) {
     cursor: isDragging ? 'grabbing' : 'grab',
   }
 
-  if (activeReps.length === 0) {
+  const hasContent = territories.length > 0 || repsWithoutTerritory.length > 0
+
+  if (!hasContent) {
     return (
       <div
         className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-2 z-[700] select-none"
@@ -87,25 +122,36 @@ function Legend({ reps, assignments }: LegendProps) {
 
   return (
     <div
-      className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-2 z-[700] min-w-32 select-none"
+      className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-2 z-[700] min-w-36 select-none"
       style={legendStyle}
       onMouseDown={handleMouseDown}
     >
       <h3 className="text-xs font-semibold text-gray-900 mb-1.5">Territories</h3>
       <div className="space-y-1">
-        {activeReps.map((rep) => {
-          const count = territoryCounts[rep.name.toLowerCase()] || 0
-          return (
-            <div key={rep.id} className="flex items-center gap-1.5">
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: rep.color }}
-              />
-              <span className="text-xs text-gray-700 flex-1 truncate">{rep.name}</span>
-              <span className="text-xs text-gray-500">{count}</span>
-            </div>
-          )
-        })}
+        {/* Named territories */}
+        {territories.map((territory) => (
+          <div key={`${territory.territoryName}-${territory.repName}`} className="flex items-center gap-1.5">
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: territory.color }}
+            />
+            <span className="text-xs text-gray-700 flex-1 truncate" title={`${territory.repName} - ${territory.territoryName}`}>
+              {territory.repName} - {territory.territoryName}
+            </span>
+            <span className="text-xs text-gray-500">{territory.count}</span>
+          </div>
+        ))}
+        {/* Reps without territory names */}
+        {repsWithoutTerritory.map((item) => (
+          <div key={item.repName} className="flex items-center gap-1.5">
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="text-xs text-gray-500 flex-1 truncate italic">{item.repName}</span>
+            <span className="text-xs text-gray-500">{item.count}</span>
+          </div>
+        ))}
       </div>
       <div className="mt-2 pt-2 border-t border-gray-200">
         <div className="flex items-center gap-1.5">

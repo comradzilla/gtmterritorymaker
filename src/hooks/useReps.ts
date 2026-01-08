@@ -6,13 +6,15 @@ import type { RepColors } from '../types'
 const STORAGE_KEY = 'territory-map-reps'
 
 interface StoredRepData {
-  [id: string]: { name: string }
+  [id: string]: { name: string; color?: string; territoryName?: string }
 }
 
 export interface UseRepsReturn {
   reps: SalesRep[]
   repColors: RepColors
   updateRepName: (id: string, newName: string) => void
+  updateRepColor: (id: string, newColor: string) => void
+  updateRepTerritory: (id: string, territoryName: string | undefined) => void
 }
 
 export function useReps(): UseRepsReturn {
@@ -25,6 +27,8 @@ export function useReps(): UseRepsReturn {
         return SALES_REPS.map((rep) => ({
           ...rep,
           name: storedData[rep.id]?.name || rep.name,
+          color: storedData[rep.id]?.color || rep.color,
+          territoryName: storedData[rep.id]?.territoryName,
         }))
       }
     } catch (e) {
@@ -38,7 +42,11 @@ export function useReps(): UseRepsReturn {
     try {
       const dataToStore: StoredRepData = {}
       reps.forEach((rep) => {
-        dataToStore[rep.id] = { name: rep.name }
+        dataToStore[rep.id] = {
+          name: rep.name,
+          color: rep.color,
+          territoryName: rep.territoryName,
+        }
       })
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore))
     } catch (e) {
@@ -59,5 +67,23 @@ export function useReps(): UseRepsReturn {
     )
   }, [])
 
-  return { reps, repColors, updateRepName }
+  // Update a rep's color
+  const updateRepColor = useCallback((id: string, newColor: string) => {
+    setReps((prev) =>
+      prev.map((rep) =>
+        rep.id === id ? { ...rep, color: newColor } : rep
+      )
+    )
+  }, [])
+
+  // Update a rep's territory name
+  const updateRepTerritory = useCallback((id: string, territoryName: string | undefined) => {
+    setReps((prev) =>
+      prev.map((rep) =>
+        rep.id === id ? { ...rep, territoryName } : rep
+      )
+    )
+  }, [])
+
+  return { reps, repColors, updateRepName, updateRepColor, updateRepTerritory }
 }

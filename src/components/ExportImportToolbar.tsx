@@ -71,7 +71,7 @@ function ExportImportToolbar({
   }
 
   const handleExportCSV = () => {
-    exportAssignmentsAsCSV(assignments, codeToName)
+    exportAssignmentsAsCSV(assignments, codeToName, reps)
     setIsExportMenuOpen(false)
   }
 

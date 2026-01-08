@@ -39,11 +39,13 @@ function AssignmentModal({
         {/* Current assignment */}
         {currentAssignment && (
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <p className="text-sm text-gray-600">Currently assigned to:</p>
-            <div className="flex items-center justify-between mt-1">
-              <span className="font-medium text-gray-900">
-                {currentAssignment.repName}
-              </span>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Currently assigned to:</p>
+                <span className="font-medium text-gray-900">
+                  {currentAssignment.repName}
+                </span>
+              </div>
               <button
                 onClick={onUnassign}
                 className="text-sm text-red-600 hover:text-red-800"
@@ -70,6 +72,9 @@ function AssignmentModal({
                 style={{ backgroundColor: rep.color }}
               />
               <span className="text-gray-900">{rep.name}</span>
+              {rep.territoryName && (
+                <span className="text-xs text-gray-400 ml-auto">{rep.territoryName}</span>
+              )}
             </button>
           ))}
         </div>

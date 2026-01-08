@@ -245,6 +245,102 @@ src/
   - Export now shows territory colors correctly
   - Build verified clean
 
+### Session 16
+- Split-Screen Panel + Territory Names (Phase 16):
+
+  **Feature 1: True Split-Screen Panel**
+  - Panel and map now sit side-by-side (flexbox layout, not overlay)
+  - Added drag-to-resize handle between panel and map
+  - Panel width persists to localStorage (min: 240px, max: 600px, default: 320px)
+  - Map auto-invalidates size when panel resizes
+  - New files: `usePanelResize.ts` hook, `ResizeHandle.tsx` component
+  - Modified Map.tsx layout from `relative` to `flex`
+  - SlideOutPanel no longer uses fixed positioning
+
+  **Feature 2: Territory Names (Optional Metadata)**
+  - Added optional `territoryName` field to Assignment type
+  - Territories are metadata under Rep assignments (Rep → Territory → States)
+  - Updated `useAssignments.ts` with `setAssignment(code, repName, territoryName?)`, `bulkAssign(codes, repName, territoryName?)`, and `updateTerritoryName(code, territoryName)`
+  - AssignmentModal: Shows current territory, allows editing, collapsible input for new assignments
+  - SlideOutPanel: Added territory name input to Quick Assign section
+  - JSON export: Added `territorySummary` to metadata, bumped version to 1.1
+  - CSV export: Added "Territory Name" column
+  - Import: Backward compatible (handles files with/without territoryName)
+  - Build verified clean
+
+### Session 17
+- Quick Assign UX + Legend Territories + Color Picker (Phase 17):
+
+  **Feature 1: Quick Assign State Persistence**
+  - When selecting a rep, the states text field auto-populates with their current assigned states (comma-separated)
+  - Enables easy editing: add/remove states and Apply to update
+  - States field updates automatically after Apply (no more clearing)
+  - Switching reps shows that rep's assigned states
+
+  **Feature 2: Legend Flat Territory List**
+  - Legend now shows territories as a flat list instead of just rep names
+  - Format: "● Territory Name (Rep First Name) count"
+  - States without territory names shown in italics under rep name
+  - Unassigned section remains at bottom
+
+  **Feature 3: Rep Color Picker**
+  - Click color dot next to rep name → Opens color palette popover
+  - 10-color palette (Blue, Green, Amber, Red, Purple, Pink, Cyan, Orange, Lime, Indigo)
+  - Selected color has ring indicator
+  - Colors persist to localStorage
+  - All map territories update immediately when color changes
+
+  **Feature 4: Territory Count in Manage Reps**
+  - Shows territory count next to rep name: "Rep Name (2 territories)"
+  - Only shows count if rep has named territories
+  - Count updates dynamically as territories are assigned
+
+  **Files Modified:**
+  - `src/hooks/useReps.ts` - Added `updateRepColor` function, persist color to localStorage
+  - `src/components/SlideOutPanel.tsx` - State persistence, color picker, territory counts
+  - `src/components/Legend.tsx` - Flat territory list display
+  - `src/components/Map/Map.tsx` - Pass new props to SlideOutPanel
+  - Build verified clean
+
+### Session 18
+- UI Refinements + Data Model Change (Phase 18):
+
+  **Issue 1: Color Picker Horizontal Toolbar**
+  - Problem: Grid layout `grid grid-cols-5 gap-1` was rendering colors jumbled/overlapped
+  - Solution: Replaced popover with horizontal inline toolbar below selected rep row
+  - Now shows 10 color circles in a single row using `flex gap-1.5`
+  - Current color has ring indicator, click outside or select color to close
+
+  **Issue 2: Rep Selection UX - Click Name to Select, Pencil to Edit**
+  - Problem: Clicking rep name immediately entered edit mode, making selection difficult
+  - Solution: Display name as plain text (clickable for row selection)
+  - Added small pencil icon button to enter edit mode
+  - Input field only shown when actively editing
+
+  **Issue 3: Two-Column Layout - Show Territory Name**
+  - Added territory column beside rep name (separated by vertical bar)
+  - Territory is editable inline (click to edit, shows "—" when empty)
+  - Format: `● Aaron Sample ✏️ │ West`
+
+  **Issue 4: Data Model Change - Territory Per Rep (BREAKING)**
+  - **Old model:** Territory stored per-state: `Assignment = { repName, territoryName? }`
+  - **New model:** Territory stored per-rep: `SalesRep = { id, name, color, territoryName? }`
+  - Simpler mental model: Rep owns a single territory, all their states belong to it
+  - JSON export version bumped to 2.0
+
+  **Files Modified:**
+  - `src/data/reps.ts` - Added `territoryName?: string` to SalesRep interface
+  - `src/hooks/useReps.ts` - Added `updateRepTerritory()` function, territory persists to localStorage
+  - `src/types/index.ts` - Removed `territoryName` from Assignment interface
+  - `src/hooks/useAssignments.ts` - Removed all territory handling (setAssignment, bulkAssign simplified)
+  - `src/components/SlideOutPanel.tsx` - Major UI rewrite (horizontal color picker, pencil to edit, territory column)
+  - `src/components/AssignmentModal.tsx` - Removed territory input section (simplified)
+  - `src/components/Legend.tsx` - Updated to use `rep.territoryName` instead of `assignment.territoryName`
+  - `src/utils/exportUtils.ts` - Updated JSON/CSV export to use rep territories, version 2.0
+  - `src/components/ExportImportToolbar.tsx` - Pass `reps` to CSV export
+  - `src/components/Map/Map.tsx` - Updated props (added `onUpdateRepTerritory`, removed territory from assignment handlers)
+  - Build verified clean
+
 ---
 
 ## Known Issues
@@ -256,7 +352,6 @@ src/
 
 ## Future Considerations
 - Add/remove sales reps dynamically
-- Custom color picker for reps
 - Territory sharing between reps
 - Integration with CRM systems
 - Mobile responsive layout

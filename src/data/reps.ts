@@ -2,6 +2,7 @@ export interface SalesRep {
   id: string
   name: string
   color: string
+  territoryName?: string
 }
 
 export const SALES_REPS: SalesRep[] = [

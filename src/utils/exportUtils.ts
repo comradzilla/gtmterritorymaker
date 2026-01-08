@@ -8,7 +8,7 @@ export interface ExportedAssignments {
   metadata: {
     totalStates: number
     totalAssigned: number
-    repSummary: { name: string; count: number }[]
+    repSummary: { name: string; territoryName?: string; count: number }[]
   }
 }
 
@@ -20,19 +20,24 @@ export function exportAssignmentsAsJSON(
   reps: SalesRep[]
 ): void {
   const repCounts = new Map<string, number>()
+
   Object.values(assignments).forEach((a) => {
     repCounts.set(a.repName, (repCounts.get(a.repName) || 0) + 1)
   })
 
   const exportData: ExportedAssignments = {
-    version: '1.0',
+    version: '2.0',
     exportedAt: new Date().toISOString(),
     assignments,
     metadata: {
       totalStates: Object.keys(assignments).length,
       totalAssigned: Object.keys(assignments).length,
       repSummary: reps
-        .map((r) => ({ name: r.name, count: repCounts.get(r.name) || 0 }))
+        .map((r) => ({
+          name: r.name,
+          territoryName: r.territoryName,
+          count: repCounts.get(r.name) || 0,
+        }))
         .filter((r) => r.count > 0),
     },
   }
@@ -48,15 +53,25 @@ export function exportAssignmentsAsJSON(
  */
 export function exportAssignmentsAsCSV(
   assignments: TerritoryAssignments,
-  codeToName: Record<string, string>
+  codeToName: Record<string, string>,
+  reps: SalesRep[]
 ): void {
-  const headers = ['State Code', 'State Name', 'Rep Name', 'Assigned At']
+  // Build rep name to territory lookup
+  const repTerritoryLookup = new Map<string, string>()
+  reps.forEach((rep) => {
+    if (rep.territoryName) {
+      repTerritoryLookup.set(rep.name, rep.territoryName)
+    }
+  })
+
+  const headers = ['State Code', 'State Name', 'Rep Name', 'Territory Name', 'Assigned At']
   const rows = Object.entries(assignments)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([code, assignment]) => [
       code,
       codeToName[code] || code,
       assignment.repName,
+      repTerritoryLookup.get(assignment.repName) || '',
       assignment.assignedAt,
     ])
 
@@ -101,11 +116,10 @@ export async function parseImportedJSON(
         'repName' in value &&
         typeof (value as { repName: unknown }).repName === 'string'
       ) {
+        const v = value as { repName: string; assignedAt?: string }
         validated[code] = {
-          repName: (value as { repName: string }).repName,
-          assignedAt:
-            (value as { assignedAt?: string }).assignedAt ||
-            new Date().toISOString(),
+          repName: v.repName,
+          assignedAt: v.assignedAt || new Date().toISOString(),
         }
       }
     }
