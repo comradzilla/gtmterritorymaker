@@ -76,9 +76,8 @@ src/
 │   ├── AssignmentModal.tsx      # Single state assignment
 │   ├── Legend.tsx               # Territory summary
 │   ├── SlideOutPanel.tsx        # Bulk assign + rep management
-│   ├── ExportImportToolbar.tsx  # Undo/redo + export/import UI
+│   ├── ExportImportToolbar.tsx  # Unified toolbar (undo/redo, export, import, labels, zoom)
 │   ├── StateSearch.tsx          # Search autocomplete with flyTo
-│   ├── MapExportButton.tsx      # Image export with options dialog
 │   └── ConfirmationDialog.tsx   # Reusable confirmation modal
 ├── hooks/
 │   ├── useGeoJson.ts            # Fetches map data + lookup maps
@@ -154,6 +153,14 @@ src/
   - Legend is now draggable (click and drag to reposition)
   - Legend styling more compact (smaller text, dots, padding)
   - Map default view centered on continental US (zoom 4.5)
+
+### Session 6
+- Toolbar Consolidation (Phase 6):
+  - Moved zoom controls from top-left to top-right toolbar
+  - Consolidated all exports into single "Export" dropdown (JSON, CSV, PNG, JPEG)
+  - Moved Labels toggle into toolbar
+  - Removed separate MapExportButton component (merged into toolbar)
+  - Cleaner unified toolbar: `[Undo][Redo] | [Export▼] | [Import] | [Labels] | [+][-] | Save`
 
 ---
 

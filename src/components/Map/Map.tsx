@@ -7,7 +7,6 @@ import Legend from '../Legend'
 import SlideOutPanel from '../SlideOutPanel'
 import ExportImportToolbar from '../ExportImportToolbar'
 import StateSearch, { type StateSearchHandle } from '../StateSearch'
-import MapExportButton from '../MapExportButton'
 import { useGeoJson } from '../../hooks/useGeoJson'
 import { useReps } from '../../hooks/useReps'
 import { useAssignments } from '../../hooks/useAssignments'
@@ -151,6 +150,11 @@ function Map() {
         canRedo={canRedo}
         lastSaved={lastSaved}
         isDirty={isDirty}
+        mapRef={mapRef}
+        mapContainerRef={mapContainerRef}
+        legendRef={legendRef}
+        showLabels={showLabels}
+        onToggleLabels={setShowLabels}
       />
 
       {/* State Search */}
@@ -161,20 +165,6 @@ function Map() {
           onSelectState={handleSelectState}
           centroids={centroids}
         />
-      </div>
-
-      {/* Labels Toggle */}
-      <div className="fixed top-16 right-4 z-[750]" data-export-exclude="true">
-        <button
-          onClick={() => setShowLabels(!showLabels)}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg shadow-lg border ${
-            showLabels
-              ? 'bg-blue-50 text-blue-700 border-blue-200'
-              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          {showLabels ? 'Labels On' : 'Labels Off'}
-        </button>
       </div>
 
       {/* Slide-out Panel */}
@@ -192,6 +182,7 @@ function Map() {
         zoom={4.5}
         minZoom={2}
         maxZoom={8}
+        zoomControl={false}
         scrollWheelZoom={true}
         style={{ width: '100%', height: '100%' }}
         maxBounds={[[10, -180], [85, -50]]}
@@ -220,16 +211,6 @@ function Map() {
       {/* Legend */}
       <div ref={legendRef}>
         <Legend reps={reps} assignments={assignments} />
-      </div>
-
-      {/* Map Export Button */}
-      <div className="fixed bottom-24 right-4 z-[700]" data-export-exclude="true">
-        <MapExportButton
-          mapContainerRef={mapContainerRef}
-          legendRef={legendRef}
-          showLabels={showLabels}
-          onToggleLabels={setShowLabels}
-        />
       </div>
 
       {/* Assignment Modal */}
