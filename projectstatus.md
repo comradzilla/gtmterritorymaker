@@ -182,6 +182,56 @@ src/
   - Added `leaflet-tooltip` filter in mapExporter.ts to exclude hover tooltips from screenshot
   - Build verified clean
 
+### Session 10
+- Labels Export Fix (Phase 10):
+  - Added `state-label-marker` to filter in mapExporter.ts
+  - `html-to-image` library cannot handle Leaflet DivIcon markers with `text-shadow` CSS
+  - Trade-off: Labels visible on screen but excluded from PNG/JPEG export (export now works reliably)
+  - Build verified clean
+
+### Session 11
+- Canvas Overlay for Labels (Phase 11):
+  - html2canvas didn't work (failed with legend and labels)
+  - Reverted to `html-to-image` (which works without labels)
+  - Implemented canvas overlay approach: draw labels programmatically onto canvas after capture
+  - Labels are drawn at centroid pixel coordinates using Canvas 2D API
+  - White outline + dark text simulates the text-shadow effect
+  - Leader lines drawn for small states (RI, DE, CT, etc.)
+  - Export now passes map bounds and visible codes to exporter
+  - Build verified clean
+
+### Session 12
+- Canvas Legend Drawing (Phase 12):
+  - Fixed legend export failure by drawing legend directly on canvas (like labels)
+  - Added `LegendData` interface and `drawLegendOnCanvas` function to mapExporter.ts
+  - Legend now drawn with rounded rectangle background, shadow, title, rep colors/names/counts, separator, and "Unassigned" row
+  - Removed dependency on html-to-image for legend capture
+  - ExportImportToolbar now passes `legendData` (reps + assignments) to export function
+  - Export now works reliably with both labels AND legend enabled
+  - Build verified clean
+
+### Session 13
+- Switch to leaflet-image Library (Phase 13):
+  - `html-to-image` was hanging indefinitely when capturing Leaflet maps (timeout after 30s)
+  - Replaced with `leaflet-image` library specifically designed for Leaflet map capture
+  - Rewrote `mapExporter.ts` to use leaflet-image callback API
+  - Changed function signature: now takes `LeafletMap` instead of `HTMLElement`
+  - Removed unused `mapContainerRef` and `legendRef` props from ExportImportToolbar
+  - Added type declaration file for leaflet-image (`src/types/leaflet-image.d.ts`)
+  - Export now works reliably - captures map in ~1 second
+  - Labels and legend drawn programmatically on canvas after capture
+  - Build verified clean
+
+### Session 14
+- Fix Export with Labels Enabled (Phase 14):
+  - Root cause: `leaflet-image` crashes on DivIcon markers (used for state labels) because they don't have iconUrl
+  - TypeError: Cannot read properties of undefined (reading 'match') in handleMarkerLayer
+  - Fix: Temporarily remove DivIcon markers from map before capture, restore afterward
+  - Process: Remove markers → capture map → draw labels on canvas → restore markers
+  - Removed unused `leaflet-easyprint` type declarations (was interfering with Leaflet types)
+  - Export now works reliably with both labels ON and OFF
+  - Build verified clean
+
 ---
 
 ## Known Issues

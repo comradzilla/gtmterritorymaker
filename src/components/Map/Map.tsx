@@ -152,8 +152,6 @@ function Map() {
         lastSaved={lastSaved}
         isDirty={isDirty}
         mapRef={mapRef}
-        mapContainerRef={mapContainerRef}
-        legendRef={legendRef}
         showLabels={showLabels}
         onToggleLabels={setShowLabels}
         showLegend={showLegend}
