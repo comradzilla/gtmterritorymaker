@@ -1,6 +1,16 @@
 import leafletImage from 'leaflet-image'
+import L from 'leaflet'
 import type { Map as LeafletMap, Layer, Marker } from 'leaflet'
 import { ALL_CENTROIDS, SMALL_STATE_LABEL_OFFSETS, needsLeaderLine } from '../data/stateCentroids'
+
+interface LabelPosition {
+  code: string
+  labelX: number
+  labelY: number
+  centroidX: number
+  centroidY: number
+  hasLeader: boolean
+}
 
 export interface LegendData {
   reps: { name: string; color: string }[]
@@ -83,13 +93,43 @@ export async function exportMapAsImage(
   map: LeafletMap,
   options: MapExportOptions
 ): Promise<void> {
-  const { format, quality = 0.95, includeLegend, includeLabels = false, filename, mapBounds, visibleCodes, legendData } = options
+  const { format, quality = 0.95, includeLegend, includeLabels = false, filename, visibleCodes, legendData } = options
 
   const TIMEOUT_MS = 15000 // 15 seconds
 
+  // Pre-calculate label positions using Leaflet's projection BEFORE removing markers
+  // This gives us accurate pixel positions that match the map's projection
+  const labelPositions: LabelPosition[] = []
+  const mapSize = map.getSize()
+
+  if (includeLabels && visibleCodes) {
+    for (const code of visibleCodes) {
+      const centroid = ALL_CENTROIDS[code]
+      if (!centroid) continue
+
+      const hasLeader = needsLeaderLine(code)
+      const labelOffset = SMALL_STATE_LABEL_OFFSETS[code]
+      const labelLat = hasLeader && labelOffset ? labelOffset.labelLat : centroid.lat
+      const labelLng = hasLeader && labelOffset ? labelOffset.labelLng : centroid.lng
+
+      // Use Leaflet's projection to get accurate pixel positions
+      const labelPoint = map.latLngToContainerPoint(L.latLng(labelLat, labelLng))
+      const centroidPoint = map.latLngToContainerPoint(L.latLng(centroid.lat, centroid.lng))
+
+      labelPositions.push({
+        code,
+        labelX: labelPoint.x,
+        labelY: labelPoint.y,
+        centroidX: centroidPoint.x,
+        centroidY: centroidPoint.y,
+        hasLeader,
+      })
+    }
+    console.log(`Pre-calculated positions for ${labelPositions.length} labels`)
+  }
+
   // Remove DivIcon markers before capture - leaflet-image can't handle them
   // It crashes when trying to get iconUrl from DivIcon markers
-  // We'll draw labels programmatically on canvas instead
   const removedLayers: Layer[] = []
   map.eachLayer((layer: Layer) => {
     // Check if this is a Marker with a DivIcon (no iconUrl)
@@ -133,10 +173,13 @@ export async function exportMapAsImage(
     // Get canvas context for drawing overlays
     const ctx = canvas.getContext('2d')!
 
-    // Draw labels if requested and we have bounds
-    if (includeLabels && mapBounds && visibleCodes) {
+    // Draw labels if requested using pre-calculated positions
+    if (includeLabels && labelPositions.length > 0) {
       console.log('Drawing labels...')
-      drawLabelsOnCanvas(ctx, canvas.width, canvas.height, mapBounds, visibleCodes)
+      // Calculate scale factor between map container and canvas
+      const scaleX = canvas.width / mapSize.x
+      const scaleY = canvas.height / mapSize.y
+      drawLabelsOnCanvas(ctx, labelPositions, scaleX, scaleY)
       console.log('Labels drawn')
     }
 
@@ -176,45 +219,33 @@ export async function exportMapAsImage(
 }
 
 /**
- * Draw state labels directly onto the canvas
+ * Draw state labels directly onto the canvas using pre-calculated positions
  */
 function drawLabelsOnCanvas(
   ctx: CanvasRenderingContext2D,
-  canvasWidth: number,
-  canvasHeight: number,
-  bounds: { north: number; south: number; east: number; west: number },
-  visibleCodes: string[]
+  labelPositions: LabelPosition[],
+  scaleX: number,
+  scaleY: number
 ): void {
-  // Set up text styling
-  ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  // Set up text styling - scale font size with canvas
+  const fontSize = Math.round(12 * Math.max(scaleX, scaleY))
+  ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
-  for (const code of visibleCodes) {
-    const centroid = ALL_CENTROIDS[code]
-    if (!centroid) continue
-
-    // Get label position (use offset for small states)
-    const hasLeader = needsLeaderLine(code)
-    const labelOffset = SMALL_STATE_LABEL_OFFSETS[code]
-    const labelLat = hasLeader && labelOffset ? labelOffset.labelLat : centroid.lat
-    const labelLng = hasLeader && labelOffset ? labelOffset.labelLng : centroid.lng
-
-    // Convert lat/lng to pixel coordinates
-    const x = lngToX(labelLng, bounds.west, bounds.east, canvasWidth)
-    const y = latToY(labelLat, bounds.north, bounds.south, canvasHeight)
-
-    // Skip if outside canvas
-    if (x < 0 || x > canvasWidth || y < 0 || y > canvasHeight) continue
+  for (const pos of labelPositions) {
+    // Scale positions to match canvas size
+    const x = pos.labelX * scaleX
+    const y = pos.labelY * scaleY
 
     // Draw leader line for small states
-    if (hasLeader) {
-      const centroidX = lngToX(centroid.lng, bounds.west, bounds.east, canvasWidth)
-      const centroidY = latToY(centroid.lat, bounds.north, bounds.south, canvasHeight)
+    if (pos.hasLeader) {
+      const centroidX = pos.centroidX * scaleX
+      const centroidY = pos.centroidY * scaleY
 
       ctx.strokeStyle = '#6b7280'
-      ctx.lineWidth = 1
-      ctx.setLineDash([4, 4])
+      ctx.lineWidth = Math.max(1, scaleX)
+      ctx.setLineDash([4 * scaleX, 4 * scaleX])
       ctx.beginPath()
       ctx.moveTo(x, y)
       ctx.lineTo(centroidX, centroidY)
@@ -224,12 +255,12 @@ function drawLabelsOnCanvas(
 
     // Draw white outline (simulate text-shadow)
     ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth = 3
-    ctx.strokeText(code, x, y)
+    ctx.lineWidth = 3 * Math.max(scaleX, scaleY)
+    ctx.strokeText(pos.code, x, y)
 
     // Draw text
     ctx.fillStyle = '#1f2937'
-    ctx.fillText(code, x, y)
+    ctx.fillText(pos.code, x, y)
   }
 }
 
@@ -356,20 +387,6 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   ctx.lineTo(x, y + radius)
   ctx.quadraticCurveTo(x, y, x + radius, y)
   ctx.closePath()
-}
-
-/**
- * Convert longitude to X pixel coordinate
- */
-function lngToX(lng: number, west: number, east: number, width: number): number {
-  return ((lng - west) / (east - west)) * width
-}
-
-/**
- * Convert latitude to Y pixel coordinate (inverted because Y increases downward)
- */
-function latToY(lat: number, north: number, south: number, height: number): number {
-  return ((north - lat) / (north - south)) * height
 }
 
 /**
