@@ -1,5 +1,5 @@
-import type { TerritoryAssignments } from '../types'
 import type { SalesRep } from '../data/reps'
+import type { TerritoryAssignments } from '../types'
 
 export interface ExportedAssignments {
   version: string

@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
 import type { SalesRep } from '../data/reps'
 import type { StateLookupMaps } from '../hooks/useGeoJson'
 import type { TerritoryAssignments } from '../types'
@@ -12,6 +13,19 @@ const COLOR_PALETTE = [
   '#8B5CF6', // Purple
   '#EC4899', // Pink
 ]
+
+type FeedbackType = 'success' | 'error'
+
+interface Feedback {
+  type: FeedbackType
+  message: string
+}
+
+function getFeedbackStyle(type: FeedbackType): string {
+  return type === 'success'
+    ? 'bg-green-50 text-green-700'
+    : 'bg-red-50 text-red-700'
+}
 
 interface SlideOutPanelProps {
   reps: SalesRep[]
@@ -39,7 +53,7 @@ function SlideOutPanel({
 }: SlideOutPanelProps) {
   const [statesInput, setStatesInput] = useState('')
   const [selectedRepId, setSelectedRepId] = useState('')
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [colorPickerRepId, setColorPickerRepId] = useState<string | null>(null)
   const [editingRepId, setEditingRepId] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<'name' | 'territory' | null>(null)
@@ -207,35 +221,29 @@ function SlideOutPanel({
     setColorPickerRepId(null)
   }
 
-  const saveEditing = () => {
-    if (!editingRepId || !editingField) return
-
-    if (editingField === 'name') {
-      if (editingValue.trim()) {
-        onUpdateRepName(editingRepId, editingValue.trim())
-      }
-    } else if (editingField === 'territory') {
-      onUpdateRepTerritory(editingRepId, editingValue.trim() || undefined)
-    }
-
+  const clearEditingState = () => {
     setEditingRepId(null)
     setEditingField(null)
     setEditingValue('')
   }
 
-  const cancelEditing = () => {
-    setEditingRepId(null)
-    setEditingField(null)
-    setEditingValue('')
+  const saveEditing = () => {
+    if (!editingRepId || !editingField) return
+
+    if (editingField === 'name' && editingValue.trim()) {
+      onUpdateRepName(editingRepId, editingValue.trim())
+    } else if (editingField === 'territory') {
+      onUpdateRepTerritory(editingRepId, editingValue.trim() || undefined)
+    }
+
+    clearEditingState()
   }
 
   const toggleColorPicker = (e: React.MouseEvent, repId: string) => {
     e.stopPropagation()
     setColorPickerRepId(colorPickerRepId === repId ? null : repId)
-    setPendingCustomColor(null) // Clear any pending custom color
-    // Cancel editing when opening color picker
-    setEditingRepId(null)
-    setEditingField(null)
+    setPendingCustomColor(null)
+    clearEditingState()
   }
 
   const selectColor = (repId: string, color: string) => {
@@ -290,13 +298,7 @@ function SlideOutPanel({
             </button>
 
             {feedback && (
-              <div
-                className={`p-2 text-xs rounded-md ${
-                  feedback.type === 'success'
-                    ? 'bg-green-50 text-green-700'
-                    : 'bg-red-50 text-red-700'
-                }`}
-              >
+              <div className={`p-2 text-xs rounded-md ${getFeedbackStyle(feedback.type)}`}>
                 {feedback.message}
               </div>
             )}
@@ -347,7 +349,7 @@ function SlideOutPanel({
                       onBlur={saveEditing}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') saveEditing()
-                        if (e.key === 'Escape') cancelEditing()
+                        if (e.key === 'Escape') clearEditingState()
                       }}
                       onClick={(e) => e.stopPropagation()}
                       autoFocus
@@ -387,7 +389,7 @@ function SlideOutPanel({
                       onBlur={saveEditing}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') saveEditing()
-                        if (e.key === 'Escape') cancelEditing()
+                        if (e.key === 'Escape') clearEditingState()
                       }}
                       onClick={(e) => e.stopPropagation()}
                       autoFocus

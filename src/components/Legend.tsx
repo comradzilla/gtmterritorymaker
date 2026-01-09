@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import type { SalesRep } from '../data/reps'
 import type { TerritoryAssignments } from '../types'
 

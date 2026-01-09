@@ -1,7 +1,8 @@
-import leafletImage from 'leaflet-image'
 import L from 'leaflet'
-import type { Map as LeafletMap, Layer, Marker } from 'leaflet'
-import { ALL_CENTROIDS, SMALL_STATE_LABEL_OFFSETS, needsLeaderLine } from '../data/stateCentroids'
+import type { Layer, Map as LeafletMap, Marker } from 'leaflet'
+import leafletImage from 'leaflet-image'
+
+import { ALL_CENTROIDS, needsLeaderLine, SMALL_STATE_LABEL_OFFSETS } from '../data/stateCentroids'
 
 interface LabelPosition {
   code: string
@@ -329,6 +330,23 @@ function drawLabelsOnCanvas(
 }
 
 /**
+ * Trace a polygon path onto the canvas context
+ */
+function tracePath(
+  ctx: CanvasRenderingContext2D,
+  path: { x: number; y: number }[],
+  scaleX: number,
+  scaleY: number
+): void {
+  ctx.beginPath()
+  ctx.moveTo(path[0].x * scaleX, path[0].y * scaleY)
+  for (let i = 1; i < path.length; i++) {
+    ctx.lineTo(path[i].x * scaleX, path[i].y * scaleY)
+  }
+  ctx.closePath()
+}
+
+/**
  * Draw territory polygons directly onto the canvas
  */
 function drawPolygonsOnCanvas(
@@ -341,48 +359,22 @@ function drawPolygonsOnCanvas(
     ctx.fillStyle = polygon.fillColor
     ctx.strokeStyle = '#374151' // Border color (gray-700)
     ctx.lineWidth = Math.max(1, scaleX)
-    ctx.globalAlpha = 0.5 // Match fillOpacity from StateLayer
 
     for (const path of polygon.paths) {
       if (path.length < 3) continue
 
-      ctx.beginPath()
-      const startX = path[0].x * scaleX
-      const startY = path[0].y * scaleY
-      ctx.moveTo(startX, startY)
-
-      for (let i = 1; i < path.length; i++) {
-        const x = path[i].x * scaleX
-        const y = path[i].y * scaleY
-        ctx.lineTo(x, y)
-      }
-
-      ctx.closePath()
+      // Fill with transparency
+      ctx.globalAlpha = 0.5
+      tracePath(ctx, path, scaleX, scaleY)
       ctx.fill()
-    }
 
-    // Draw borders separately with full opacity
-    ctx.globalAlpha = 1
-    for (const path of polygon.paths) {
-      if (path.length < 3) continue
-
-      ctx.beginPath()
-      const startX = path[0].x * scaleX
-      const startY = path[0].y * scaleY
-      ctx.moveTo(startX, startY)
-
-      for (let i = 1; i < path.length; i++) {
-        const x = path[i].x * scaleX
-        const y = path[i].y * scaleY
-        ctx.lineTo(x, y)
-      }
-
-      ctx.closePath()
+      // Stroke with full opacity
+      ctx.globalAlpha = 1
+      tracePath(ctx, path, scaleX, scaleY)
       ctx.stroke()
     }
   }
 
-  // Reset alpha
   ctx.globalAlpha = 1
 }
 

@@ -1,12 +1,13 @@
+import L from 'leaflet'
 import { useMemo } from 'react'
 import { Marker, Polyline } from 'react-leaflet'
-import L from 'leaflet'
-import type { StatesGeoJSON } from '../../types'
+
 import {
   ALL_CENTROIDS,
-  SMALL_STATE_LABEL_OFFSETS,
   needsLeaderLine,
+  SMALL_STATE_LABEL_OFFSETS,
 } from '../../data/stateCentroids'
+import type { StatesGeoJSON } from '../../types'
 
 interface StateLabelsProps {
   data: StatesGeoJSON

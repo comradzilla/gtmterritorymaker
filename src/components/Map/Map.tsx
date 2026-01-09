@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import StateLayer from './StateLayer'
 import StateLabels from './StateLabels'
@@ -19,14 +19,14 @@ import type { SelectedState } from '../../types'
 const CARTO_TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
 const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
 
-// Component to handle map reference and flyTo
+// Component to handle map reference
 interface MapControllerProps {
   onMapReady: (map: L.Map) => void
 }
 
-function MapController({ onMapReady }: MapControllerProps) {
+function MapController({ onMapReady }: MapControllerProps): null {
   const map = useMap()
-  useMemo(() => {
+  useEffect(() => {
     onMapReady(map)
   }, [map, onMapReady])
   return null

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import type { TerritoryAssignments } from '../types'
 
 const STORAGE_KEY = 'territory-map-assignments'

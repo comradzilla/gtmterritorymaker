@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { SALES_REPS, buildRepColorMap } from '../data/reps'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+
+import { buildRepColorMap, SALES_REPS } from '../data/reps'
 import type { SalesRep } from '../data/reps'
 import type { RepColors } from '../types'
 
@@ -57,33 +58,25 @@ export function useReps(): UseRepsReturn {
   // Build color map from current reps
   const repColors = useMemo(() => buildRepColorMap(reps), [reps])
 
-  // Update a rep's name
+  // Helper to update a specific rep field
+  const updateRep = useCallback((id: string, updates: Partial<SalesRep>) => {
+    setReps((prev) =>
+      prev.map((rep) => (rep.id === id ? { ...rep, ...updates } : rep))
+    )
+  }, [])
+
   const updateRepName = useCallback((id: string, newName: string) => {
     if (!newName.trim()) return
-    setReps((prev) =>
-      prev.map((rep) =>
-        rep.id === id ? { ...rep, name: newName.trim() } : rep
-      )
-    )
-  }, [])
+    updateRep(id, { name: newName.trim() })
+  }, [updateRep])
 
-  // Update a rep's color
   const updateRepColor = useCallback((id: string, newColor: string) => {
-    setReps((prev) =>
-      prev.map((rep) =>
-        rep.id === id ? { ...rep, color: newColor } : rep
-      )
-    )
-  }, [])
+    updateRep(id, { color: newColor })
+  }, [updateRep])
 
-  // Update a rep's territory name
   const updateRepTerritory = useCallback((id: string, territoryName: string | undefined) => {
-    setReps((prev) =>
-      prev.map((rep) =>
-        rep.id === id ? { ...rep, territoryName } : rep
-      )
-    )
-  }, [])
+    updateRep(id, { territoryName })
+  }, [updateRep])
 
   return { reps, repColors, updateRepName, updateRepColor, updateRepTerritory }
 }

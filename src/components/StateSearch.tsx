@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+
 import type { StateLookupMaps } from '../hooks/useGeoJson'
 
 interface StateSearchProps {

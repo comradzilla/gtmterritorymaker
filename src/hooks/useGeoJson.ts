@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import type { StatesGeoJSON, StateFeature } from '../types'
+import { useEffect, useState } from 'react'
+
+import type { StateFeature, StatesGeoJSON } from '../types'
 
 const US_STATES_URL = 'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
 const CANADA_URL = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/canada.geojson'

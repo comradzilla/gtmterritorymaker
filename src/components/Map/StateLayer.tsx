@@ -1,7 +1,8 @@
-import { GeoJSON } from 'react-leaflet'
-import type { Layer, PathOptions } from 'leaflet'
 import type { Feature, Geometry } from 'geojson'
-import type { StatesGeoJSON, StateProperties, TerritoryAssignments, RepColors } from '../../types'
+import type { Layer, PathOptions } from 'leaflet'
+import { GeoJSON } from 'react-leaflet'
+
+import type { RepColors, StateProperties, StatesGeoJSON, TerritoryAssignments } from '../../types'
 
 interface StateLayerProps {
   data: StatesGeoJSON
