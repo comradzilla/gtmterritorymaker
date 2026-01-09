@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import type { SalesRep } from '../data/reps'
 import type { StateLookupMaps } from '../hooks/useGeoJson'
 import type { TerritoryAssignments } from '../types'
+import ConfirmationDialog from './ConfirmationDialog'
 
 const COLOR_PALETTE = [
   '#3B82F6', // Blue
@@ -10,10 +11,6 @@ const COLOR_PALETTE = [
   '#EF4444', // Red
   '#8B5CF6', // Purple
   '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#F97316', // Orange
-  '#84CC16', // Lime
-  '#6366F1', // Indigo
 ]
 
 interface SlideOutPanelProps {
@@ -22,8 +19,13 @@ interface SlideOutPanelProps {
   onUpdateRepName: (id: string, name: string) => void
   onUpdateRepColor: (id: string, color: string) => void
   onUpdateRepTerritory: (id: string, territoryName: string | undefined) => void
-  onBulkAssign: (stateCodes: string[], repName: string) => void
+  onSyncRepAssignments: (repName: string, newCodes: string[]) => void
   lookupMaps: StateLookupMaps
+}
+
+interface ConflictInfo {
+  code: string
+  currentOwner: string
 }
 
 function SlideOutPanel({
@@ -32,7 +34,7 @@ function SlideOutPanel({
   onUpdateRepName,
   onUpdateRepColor,
   onUpdateRepTerritory,
-  onBulkAssign,
+  onSyncRepAssignments,
   lookupMaps,
 }: SlideOutPanelProps) {
   const [statesInput, setStatesInput] = useState('')
@@ -42,6 +44,22 @@ function SlideOutPanel({
   const [editingRepId, setEditingRepId] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<'name' | 'territory' | null>(null)
   const [editingValue, setEditingValue] = useState('')
+
+  // Confirmation dialog state
+  const [showConflictDialog, setShowConflictDialog] = useState(false)
+  const [pendingSync, setPendingSync] = useState<{ repName: string; codes: string[]; conflicts: ConflictInfo[] } | null>(null)
+
+  // Custom color picker state
+  const [pendingCustomColor, setPendingCustomColor] = useState<string | null>(null)
+
+  // Calculate state counts per rep
+  const repCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    Object.values(assignments).forEach((a) => {
+      counts.set(a.repName, (counts.get(a.repName) || 0) + 1)
+    })
+    return counts
+  }, [assignments])
 
   // Compute states assigned to the selected rep
   const selectedRepStates = useMemo(() => {
@@ -96,31 +114,70 @@ function SlideOutPanel({
       return
     }
 
-    if (!statesInput.trim()) {
-      setFeedback({ type: 'error', message: 'Please enter state codes or names' })
-      return
-    }
-
     const rep = reps.find((r) => r.id === selectedRepId)
     if (!rep) return
 
+    // Handle empty input - clear all assignments for this rep
+    if (!statesInput.trim()) {
+      onSyncRepAssignments(rep.name, [])
+      setFeedback({ type: 'success', message: `Cleared all states from ${rep.name}` })
+      return
+    }
+
     const { codes, invalid } = parseStatesInput(statesInput)
 
-    if (codes.length === 0) {
+    if (codes.length === 0 && invalid.length > 0) {
       setFeedback({ type: 'error', message: `No valid states found. Invalid entries: ${invalid.join(', ')}` })
       return
     }
 
-    onBulkAssign(codes, rep.name)
+    // Check for conflicts - states assigned to OTHER reps
+    const conflicts: ConflictInfo[] = []
+    codes.forEach((code) => {
+      const currentAssignment = assignments[code]
+      if (currentAssignment && currentAssignment.repName !== rep.name) {
+        conflicts.push({ code, currentOwner: currentAssignment.repName })
+      }
+    })
+
+    if (conflicts.length > 0) {
+      // Show confirmation dialog
+      setPendingSync({ repName: rep.name, codes, conflicts })
+      setShowConflictDialog(true)
+      return
+    }
+
+    // No conflicts - proceed with sync
+    onSyncRepAssignments(rep.name, codes)
 
     if (invalid.length > 0) {
       setFeedback({
         type: 'success',
-        message: `Assigned ${codes.length} state(s). Unrecognized: ${invalid.join(', ')}`,
+        message: `Updated ${codes.length} state(s). Unrecognized: ${invalid.join(', ')}`,
       })
     } else {
-      setFeedback({ type: 'success', message: `Assigned ${codes.length} state(s) to ${rep.name}` })
+      setFeedback({ type: 'success', message: `Updated ${rep.name}'s territories` })
     }
+  }
+
+  const handleConfirmReassign = () => {
+    if (!pendingSync) return
+    // User chose to reassign - proceed with all codes including conflicts
+    onSyncRepAssignments(pendingSync.repName, pendingSync.codes)
+    setFeedback({ type: 'success', message: `Reassigned ${pendingSync.conflicts.length} state(s) to ${pendingSync.repName}` })
+    setShowConflictDialog(false)
+    setPendingSync(null)
+  }
+
+  const handleCancelReassign = () => {
+    if (!pendingSync) return
+    // User chose to leave as is - sync without the conflicting codes
+    const conflictCodes = new Set(pendingSync.conflicts.map((c) => c.code))
+    const nonConflictCodes = pendingSync.codes.filter((code) => !conflictCodes.has(code))
+    onSyncRepAssignments(pendingSync.repName, nonConflictCodes)
+    setFeedback({ type: 'success', message: `Updated territories (kept ${pendingSync.conflicts.length} state(s) with original owners)` })
+    setShowConflictDialog(false)
+    setPendingSync(null)
   }
 
   const handleSelectRep = (repId: string) => {
@@ -175,6 +232,7 @@ function SlideOutPanel({
   const toggleColorPicker = (e: React.MouseEvent, repId: string) => {
     e.stopPropagation()
     setColorPickerRepId(colorPickerRepId === repId ? null : repId)
+    setPendingCustomColor(null) // Clear any pending custom color
     // Cancel editing when opening color picker
     setEditingRepId(null)
     setEditingField(null)
@@ -183,6 +241,15 @@ function SlideOutPanel({
   const selectColor = (repId: string, color: string) => {
     onUpdateRepColor(repId, color)
     setColorPickerRepId(null)
+    setPendingCustomColor(null)
+  }
+
+  const applyCustomColor = (repId: string) => {
+    if (pendingCustomColor) {
+      onUpdateRepColor(repId, pendingCustomColor)
+    }
+    setColorPickerRepId(null)
+    setPendingCustomColor(null)
   }
 
   return (
@@ -246,6 +313,7 @@ function SlideOutPanel({
             <span className="w-4"></span>
             <span className="flex-1">Name</span>
             <span className="w-3.5"></span>
+            <span className="w-6 text-center">#</span>
             <span className="mx-1"></span>
             <span className="w-28">Territory</span>
           </div>
@@ -302,6 +370,11 @@ function SlideOutPanel({
                     </button>
                   )}
 
+                  {/* State count */}
+                  <span className="w-6 text-center text-xs text-gray-500">
+                    {repCounts.get(rep.name) || 0}
+                  </span>
+
                   {/* Divider */}
                   <span className="text-gray-300 mx-1">│</span>
 
@@ -349,6 +422,42 @@ function SlideOutPanel({
                         title={color}
                       />
                     ))}
+                    {/* Custom color picker */}
+                    <label
+                      className="relative w-5 h-5 rounded-full cursor-pointer hover:scale-110 transition-transform overflow-hidden border border-gray-300"
+                      title="Custom color"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="color"
+                        value={pendingCustomColor || rep.color}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          setPendingCustomColor(e.target.value)
+                        }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      {pendingCustomColor ? (
+                        <span
+                          className="absolute inset-0"
+                          style={{ backgroundColor: pendingCustomColor }}
+                        />
+                      ) : (
+                        <span className="absolute inset-0 bg-gradient-to-br from-red-500 via-green-500 to-blue-500" />
+                      )}
+                    </label>
+                    {/* Apply button - shows when custom color is being picked */}
+                    {pendingCustomColor && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          applyCustomColor(rep.id)
+                        }}
+                        className="ml-1 px-2 py-0.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                      >
+                        Apply
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -356,6 +465,22 @@ function SlideOutPanel({
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog for reassigning states */}
+      <ConfirmationDialog
+        isOpen={showConflictDialog}
+        title="Reassign States?"
+        message={
+          pendingSync
+            ? `${pendingSync.conflicts.map((c) => c.code).join(', ')} ${pendingSync.conflicts.length === 1 ? 'is' : 'are'} already assigned to ${pendingSync.conflicts[0]?.currentOwner}. Would you like to reassign ${pendingSync.conflicts.length === 1 ? 'it' : 'them'} to ${pendingSync.repName}?`
+            : ''
+        }
+        confirmLabel="Reassign"
+        cancelLabel="Leave as is"
+        variant="warning"
+        onConfirm={handleConfirmReassign}
+        onCancel={handleCancelReassign}
+      />
     </div>
   )
 }

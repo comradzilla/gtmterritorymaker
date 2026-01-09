@@ -16,6 +16,7 @@ export interface UseAssignmentsReturn {
   setAssignment: (code: string, repName: string) => void
   removeAssignment: (code: string) => void
   bulkAssign: (codes: string[], repName: string) => void
+  syncRepAssignments: (repName: string, newCodes: string[]) => void
   clearAll: () => void
   importAssignments: (data: TerritoryAssignments) => void
   undo: () => void
@@ -128,6 +129,35 @@ export function useAssignments(): UseAssignmentsReturn {
     [history.present, pushState]
   )
 
+  // Sync a rep's assignments to exactly match the given codes
+  // - Removes states no longer in the list (that belong to this rep)
+  // - Adds new states in the list
+  const syncRepAssignments = useCallback(
+    (repName: string, newCodes: string[]) => {
+      const timestamp = new Date().toISOString()
+      const next = { ...history.present }
+      const newCodesSet = new Set(newCodes)
+
+      // Remove states that belong to this rep but are not in newCodes
+      Object.entries(next).forEach(([code, assignment]) => {
+        if (assignment.repName === repName && !newCodesSet.has(code)) {
+          delete next[code]
+        }
+      })
+
+      // Add/update states in newCodes
+      newCodes.forEach((code) => {
+        next[code] = {
+          repName,
+          assignedAt: timestamp,
+        }
+      })
+
+      pushState(next)
+    },
+    [history.present, pushState]
+  )
+
   const clearAll = useCallback(() => {
     pushState({})
   }, [pushState])
@@ -170,6 +200,7 @@ export function useAssignments(): UseAssignmentsReturn {
     setAssignment,
     removeAssignment,
     bulkAssign,
+    syncRepAssignments,
     clearAll,
     importAssignments,
     undo,

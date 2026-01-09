@@ -39,7 +39,7 @@ function Map() {
     assignments,
     setAssignment,
     removeAssignment,
-    bulkAssign,
+    syncRepAssignments,
     importAssignments,
     undo,
     redo,
@@ -95,10 +95,6 @@ function Map() {
 
   const handleCloseModal = () => {
     setSelectedState(null)
-  }
-
-  const handleBulkAssign = (stateCodes: string[], repName: string) => {
-    bulkAssign(stateCodes, repName)
   }
 
   const handleSelectState = useCallback((code: string, lat: number, lng: number) => {
@@ -160,7 +156,7 @@ function Map() {
               onUpdateRepName={updateRepName}
               onUpdateRepColor={updateRepColor}
               onUpdateRepTerritory={updateRepTerritory}
-              onBulkAssign={handleBulkAssign}
+              onSyncRepAssignments={syncRepAssignments}
               lookupMaps={lookupMaps}
             />
           </div>

@@ -51,9 +51,7 @@ function Legend({ reps, assignments }: LegendProps) {
       }
     })
 
-    // Sort territories alphabetically
-    territories.sort((a, b) => a.territoryName.localeCompare(b.territoryName))
-
+    // Keep order from reps array (matches Manage Reps order)
     return { territories, repsWithoutTerritory }
   }, [assignments, reps])
 
@@ -138,7 +136,6 @@ function Legend({ reps, assignments }: LegendProps) {
             <span className="text-xs text-gray-700 flex-1 truncate" title={`${territory.repName} - ${territory.territoryName}`}>
               {territory.repName} - {territory.territoryName}
             </span>
-            <span className="text-xs text-gray-500">{territory.count}</span>
           </div>
         ))}
         {/* Reps without territory names */}
@@ -149,7 +146,6 @@ function Legend({ reps, assignments }: LegendProps) {
               style={{ backgroundColor: item.color }}
             />
             <span className="text-xs text-gray-500 flex-1 truncate italic">{item.repName}</span>
-            <span className="text-xs text-gray-500">{item.count}</span>
           </div>
         ))}
       </div>
