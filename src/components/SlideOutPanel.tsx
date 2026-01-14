@@ -33,6 +33,7 @@ interface SlideOutPanelProps {
   onUpdateRepName: (id: string, name: string) => void
   onUpdateRepColor: (id: string, color: string) => void
   onUpdateRepTerritory: (id: string, territoryName: string | undefined) => void
+  onUpdateRepNameInAssignments: (oldName: string, newName: string) => void
   onSyncRepAssignments: (repName: string, newCodes: string[]) => void
   lookupMaps: StateLookupMaps
 }
@@ -48,6 +49,7 @@ function SlideOutPanel({
   onUpdateRepName,
   onUpdateRepColor,
   onUpdateRepTerritory,
+  onUpdateRepNameInAssignments,
   onSyncRepAssignments,
   lookupMaps,
 }: SlideOutPanelProps) {
@@ -231,7 +233,13 @@ function SlideOutPanel({
     if (!editingRepId || !editingField) return
 
     if (editingField === 'name' && editingValue.trim()) {
-      onUpdateRepName(editingRepId, editingValue.trim())
+      const oldName = reps.find((r) => r.id === editingRepId)?.name
+      const newName = editingValue.trim()
+      // Update assignments first if name changed
+      if (oldName && oldName !== newName) {
+        onUpdateRepNameInAssignments(oldName, newName)
+      }
+      onUpdateRepName(editingRepId, newName)
     } else if (editingField === 'territory') {
       onUpdateRepTerritory(editingRepId, editingValue.trim() || undefined)
     }

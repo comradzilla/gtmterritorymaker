@@ -40,6 +40,7 @@ function Map() {
     setAssignment,
     removeAssignment,
     syncRepAssignments,
+    updateRepName: updateRepNameInAssignments,
     importAssignments,
     undo,
     redo,
@@ -156,6 +157,7 @@ function Map() {
               onUpdateRepName={updateRepName}
               onUpdateRepColor={updateRepColor}
               onUpdateRepTerritory={updateRepTerritory}
+              onUpdateRepNameInAssignments={updateRepNameInAssignments}
               onSyncRepAssignments={syncRepAssignments}
               lookupMaps={lookupMaps}
             />

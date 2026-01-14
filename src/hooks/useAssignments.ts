@@ -18,6 +18,7 @@ export interface UseAssignmentsReturn {
   removeAssignment: (code: string) => void
   bulkAssign: (codes: string[], repName: string) => void
   syncRepAssignments: (repName: string, newCodes: string[]) => void
+  updateRepName: (oldName: string, newName: string) => void
   clearAll: () => void
   importAssignments: (data: TerritoryAssignments) => void
   undo: () => void
@@ -159,6 +160,26 @@ export function useAssignments(): UseAssignmentsReturn {
     [history.present, pushState]
   )
 
+  // Update repName in all assignments when a rep is renamed
+  const updateRepName = useCallback(
+    (oldName: string, newName: string) => {
+      const next = { ...history.present }
+      let hasChanges = false
+
+      Object.entries(next).forEach(([code, assignment]) => {
+        if (assignment.repName === oldName) {
+          next[code] = { ...assignment, repName: newName }
+          hasChanges = true
+        }
+      })
+
+      if (hasChanges) {
+        pushState(next)
+      }
+    },
+    [history.present, pushState]
+  )
+
   const clearAll = useCallback(() => {
     pushState({})
   }, [pushState])
@@ -202,6 +223,7 @@ export function useAssignments(): UseAssignmentsReturn {
     removeAssignment,
     bulkAssign,
     syncRepAssignments,
+    updateRepName,
     clearAll,
     importAssignments,
     undo,
