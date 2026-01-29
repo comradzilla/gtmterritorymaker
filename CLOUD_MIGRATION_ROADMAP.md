@@ -28,17 +28,23 @@
 │                     Browser                              │
 │  ┌─────────────────────────────────────────────────────┐│
 │  │  React App (Vite)                                   ││
-│  │  ┌──────────────┐  ┌──────────────┐                 ││
-│  │  │ useAssignments│  │   useReps    │                 ││
-│  │  │    Hook      │  │    Hook      │                 ││
-│  │  └──────┬───────┘  └──────┬───────┘                 ││
-│  │         │                 │                         ││
-│  │         ▼                 ▼                         ││
-│  │  ┌─────────────────────────────────────┐            ││
-│  │  │         localStorage                │            ││
-│  │  │  • territory-map-assignments        │            ││
-│  │  │  • territory-map-reps               │            ││
-│  │  └─────────────────────────────────────┘            ││
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐││
+│  │  │ useAssignments│  │   useReps    │  │useSavedMaps│││
+│  │  │    Hook      │  │    Hook      │  │   Hook     │││
+│  │  └──────┬───────┘  └──────┬───────┘  └─────┬──────┘││
+│  │         │                 │                │        ││
+│  │         ▼                 ▼                ▼        ││
+│  │  ┌─────────────────────────────────────────────────┐││
+│  │  │                localStorage                     │││
+│  │  │  Working State:                                 │││
+│  │  │  • territory-map-assignments                    │││
+│  │  │  • territory-map-reps                           │││
+│  │  │                                                 │││
+│  │  │  Saved Maps:                                    │││
+│  │  │  • territory-map-saved-list (metadata array)    │││
+│  │  │  • territory-map-saved-{id} (full map data)     │││
+│  │  │  • territory-map-active-id                      │││
+│  │  └─────────────────────────────────────────────────┘││
 │  └─────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────┘
 
@@ -49,10 +55,18 @@ External:
 
 ### Current Data Models
 
+**Working State (active editing)**
 | Model | Storage Key | Description |
 |-------|-------------|-------------|
 | `TerritoryAssignments` | `territory-map-assignments` | `{ [stateCode]: { repName, assignedAt } }` |
-| `SalesRep[]` | `territory-map-reps` | `{ id, name, color, territoryName? }` |
+| `StoredRepData` | `territory-map-reps` | `{ [repId]: { name, color?, territoryName? } }` |
+
+**Saved Maps (persistent storage)**
+| Model | Storage Key | Description |
+|-------|-------------|-------------|
+| `SavedMapMeta[]` | `territory-map-saved-list` | Array of `{ id, name, createdAt, modifiedAt, stateCount }` |
+| `SavedMap` | `territory-map-saved-{id}` | `{ id, name, dates, reps, assignments }` |
+| `string \| null` | `territory-map-active-id` | Currently active map ID |
 
 ---
 
@@ -119,13 +133,15 @@ External:
 ### Phase 2: Add Supabase Database
 **Goal**: Persist territory data to cloud database.
 
+**Note**: The app already has a local saved maps feature with similar data model. Migration will sync localStorage maps to Supabase.
+
 **Supabase Tables**:
 
 ```sql
 -- Users table (auto-created by Supabase Auth)
 -- We reference auth.users
 
--- User's saved maps
+-- User's saved maps (mirrors local SavedMap structure)
 CREATE TABLE maps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -134,7 +150,7 @@ CREATE TABLE maps (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Territory assignments
+-- Territory assignments (mirrors local TerritoryAssignments)
 CREATE TABLE assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   map_id UUID REFERENCES maps(id) ON DELETE CASCADE,
@@ -144,7 +160,7 @@ CREATE TABLE assignments (
   UNIQUE(map_id, state_code)
 );
 
--- Sales rep configurations
+-- Sales rep configurations (mirrors local StoredRepData)
 CREATE TABLE reps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   map_id UUID REFERENCES maps(id) ON DELETE CASCADE,
@@ -174,13 +190,13 @@ CREATE POLICY "Users can CRUD own reps" ON reps
 **Hook Changes** (conceptual):
 
 ```typescript
-// Current: useAssignments reads/writes localStorage
-// New: useAssignments reads/writes Supabase
+// Current: useSavedMaps reads/writes localStorage
+// New: useSavedMaps reads/writes Supabase with localStorage fallback
 
-const useAssignments = (mapId: string) => {
-  // Fetch from Supabase on mount
-  // Save to Supabase on change (debounced)
-  // Fallback to localStorage for offline support
+const useSavedMaps = (userId: string | null) => {
+  // If authenticated: sync with Supabase
+  // If anonymous: use localStorage only
+  // On first sign-in: migrate localStorage maps to Supabase
 }
 ```
 
@@ -310,21 +326,27 @@ STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 ```
 src/
 ├── lib/
-│   ├── supabase.ts          # Supabase client init
-│   └── stripe.ts            # Stripe client init
+│   ├── supabase.ts           # Supabase client init
+│   └── stripe.ts             # Stripe client init
 ├── hooks/
-│   ├── useAssignments.ts    # Modified: Supabase sync
-│   ├── useReps.ts           # Modified: Supabase sync
-│   ├── useAuth.ts           # NEW: Auth state management
-│   └── useSubscription.ts   # NEW: Check export access
+│   ├── useAssignments.ts     # Existing: has resetToData for loading maps
+│   ├── useReps.ts            # Existing: has resetToData for loading maps
+│   ├── useSavedMaps.ts       # Existing: Modified for Supabase sync
+│   ├── useAuth.ts            # NEW: Auth state management
+│   └── useSubscription.ts    # NEW: Check export access
+├── utils/
+│   └── savedMapsStorage.ts   # Existing: Modified for Supabase sync
 ├── components/
-│   ├── AuthProvider.tsx     # NEW: Auth context wrapper
-│   ├── SignInButton.tsx     # NEW: Google sign-in
-│   ├── UserMenu.tsx         # NEW: User dropdown
-│   └── PaywallModal.tsx     # NEW: Upgrade prompt
-api/                          # Vercel serverless functions
-├── stripe-webhook.ts        # Handle Stripe events
-└── create-checkout.ts       # Create Stripe checkout session
+│   ├── SavedMapsDropdown.tsx # Existing: Uses useSavedMaps
+│   ├── SaveMapDialog.tsx     # Existing: Map naming dialog
+│   ├── MapListModal.tsx      # Existing: Map browser
+│   ├── AuthProvider.tsx      # NEW: Auth context wrapper
+│   ├── SignInButton.tsx      # NEW: Google sign-in
+│   ├── UserMenu.tsx          # NEW: User dropdown
+│   └── PaywallModal.tsx      # NEW: Upgrade prompt
+api/                           # Vercel serverless functions
+├── stripe-webhook.ts         # Handle Stripe events
+└── create-checkout.ts        # Create Stripe checkout session
 ```
 
 ---

@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import type { SalesRep } from '../data/reps'
 import type { StateLookupMaps } from '../hooks/useGeoJson'
 import type { TerritoryAssignments } from '../types'
+import type { SavedMapMeta } from '../types/savedMaps'
 import ConfirmationDialog from './ConfirmationDialog'
+import SavedMapsDropdown from './SavedMapsDropdown'
 
 const COLOR_PALETTE = [
   '#3B82F6', // Blue
@@ -36,6 +38,16 @@ interface SlideOutPanelProps {
   onUpdateRepNameInAssignments: (oldName: string, newName: string) => void
   onSyncRepAssignments: (repName: string, newCodes: string[]) => void
   lookupMaps: StateLookupMaps
+  // Saved maps props
+  activeMapName: string | null
+  activeMapId: string | null
+  hasUnsavedChanges: boolean
+  savedMaps: SavedMapMeta[]
+  onSave: () => void
+  onSaveAs: () => void
+  onNewMap: () => void
+  onOpenMapList: () => void
+  onLoadMap: (id: string) => void
 }
 
 interface ConflictInfo {
@@ -52,6 +64,15 @@ function SlideOutPanel({
   onUpdateRepNameInAssignments,
   onSyncRepAssignments,
   lookupMaps,
+  activeMapName,
+  activeMapId,
+  hasUnsavedChanges,
+  savedMaps,
+  onSave,
+  onSaveAs,
+  onNewMap,
+  onOpenMapList,
+  onLoadMap,
 }: SlideOutPanelProps) {
   const [statesInput, setStatesInput] = useState('')
   const [selectedRepId, setSelectedRepId] = useState('')
@@ -272,7 +293,18 @@ function SlideOutPanel({
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-        <h2 className="text-lg font-semibold text-gray-900">Territory Manager</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Territory Manager</h2>
+        <SavedMapsDropdown
+          activeMapName={activeMapName}
+          activeMapId={activeMapId}
+          hasUnsavedChanges={hasUnsavedChanges}
+          savedMaps={savedMaps}
+          onSave={onSave}
+          onSaveAs={onSaveAs}
+          onNew={onNewMap}
+          onOpenList={onOpenMapList}
+          onLoadMap={onLoadMap}
+        />
       </div>
 
       {/* Content */}

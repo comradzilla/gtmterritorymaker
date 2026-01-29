@@ -90,6 +90,9 @@ export function createShortcuts(handlers: {
   onRedo?: () => void
   onEscape?: () => void
   onSearch?: () => void
+  onSave?: () => void
+  onSaveAs?: () => void
+  onOpenMaps?: () => void
 }): ShortcutConfig[] {
   const shortcuts: ShortcutConfig[] = []
 
@@ -135,6 +138,34 @@ export function createShortcuts(handlers: {
       key: 'f',
       meta: true,
       handler: handlers.onSearch,
+    })
+  }
+
+  if (handlers.onSave) {
+    // Cmd+S
+    shortcuts.push({
+      key: 's',
+      meta: true,
+      handler: handlers.onSave,
+    })
+  }
+
+  if (handlers.onSaveAs) {
+    // Cmd+Shift+S
+    shortcuts.push({
+      key: 's',
+      meta: true,
+      shift: true,
+      handler: handlers.onSaveAs,
+    })
+  }
+
+  if (handlers.onOpenMaps) {
+    // Cmd+O
+    shortcuts.push({
+      key: 'o',
+      meta: true,
+      handler: handlers.onOpenMaps,
     })
   }
 

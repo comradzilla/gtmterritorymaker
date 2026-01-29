@@ -3,12 +3,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { buildRepColorMap, SALES_REPS } from '../data/reps'
 import type { SalesRep } from '../data/reps'
 import type { RepColors } from '../types'
+import type { StoredRepData } from '../types/savedMaps'
 
 const STORAGE_KEY = 'territory-map-reps'
 
-interface StoredRepData {
-  [id: string]: { name: string; color?: string; territoryName?: string }
-}
+const COLOR_PALETTE = [
+  '#3B82F6', // Blue
+  '#10B981', // Green
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+  '#8B5CF6', // Purple
+  '#EC4899', // Pink
+]
 
 export interface UseRepsReturn {
   reps: SalesRep[]
@@ -16,6 +22,9 @@ export interface UseRepsReturn {
   updateRepName: (id: string, newName: string) => void
   updateRepColor: (id: string, newColor: string) => void
   updateRepTerritory: (id: string, territoryName: string | undefined) => void
+  importReps: (names: string[]) => void
+  resetToData: (data: StoredRepData) => void
+  getStoredRepData: () => StoredRepData
 }
 
 export function useReps(): UseRepsReturn {
@@ -78,5 +87,49 @@ export function useReps(): UseRepsReturn {
     updateRep(id, { territoryName })
   }, [updateRep])
 
-  return { reps, repColors, updateRepName, updateRepColor, updateRepTerritory }
+  // Import rep names - updates existing reps with new names and auto-assigns colors
+  const importReps = useCallback((names: string[]) => {
+    setReps((prev) =>
+      prev.map((rep, index) => {
+        const newName = names[index]
+        if (newName) {
+          return {
+            ...rep,
+            name: newName.trim(),
+            color: COLOR_PALETTE[index % COLOR_PALETTE.length],
+            territoryName: undefined, // Clear territory on import
+          }
+        }
+        // Keep existing rep if no name provided for this slot
+        return rep
+      })
+    )
+  }, [])
+
+  // Reset to specific data (for loading saved maps)
+  const resetToData = useCallback((data: StoredRepData) => {
+    setReps(
+      SALES_REPS.map((rep) => ({
+        ...rep,
+        name: data[rep.id]?.name || rep.name,
+        color: data[rep.id]?.color || rep.color,
+        territoryName: data[rep.id]?.territoryName,
+      }))
+    )
+  }, [])
+
+  // Get current reps as stored data format
+  const getStoredRepData = useCallback((): StoredRepData => {
+    const data: StoredRepData = {}
+    reps.forEach((rep) => {
+      data[rep.id] = {
+        name: rep.name,
+        color: rep.color,
+        territoryName: rep.territoryName,
+      }
+    })
+    return data
+  }, [reps])
+
+  return { reps, repColors, updateRepName, updateRepColor, updateRepTerritory, importReps, resetToData, getStoredRepData }
 }

@@ -17,13 +17,18 @@ User clicks state → AssignmentModal → useAssignments hook → localStorage
 
 ### State Management Pattern
 - **No Redux/Zustand** - All state managed via React hooks + localStorage
-- **Two separate storage keys:**
+- **Working state keys:**
   - `territory-map-reps` - Rep names, colors, territory names
   - `territory-map-assignments` - State-to-rep mappings
+- **Saved maps keys:**
+  - `territory-map-saved-list` - Array of saved map metadata
+  - `territory-map-saved-{id}` - Full saved map data for each map
+  - `territory-map-active-id` - Currently active map ID
 - **Hooks own their domain:**
   - `useAssignments` - Assignment CRUD + undo/redo history
   - `useReps` - Rep data management
   - `useGeoJson` - Map data fetching + lookup tables
+  - `useSavedMaps` - Save/load/delete maps, tracks unsaved changes
 
 ### Component Hierarchy
 ```
@@ -32,10 +37,14 @@ Map.tsx (orchestrator)
 │   ├── StateLayer (GeoJSON polygons)
 │   └── StateLabels (DivIcon markers)
 ├── SlideOutPanel (left side)
+│   └── SavedMapsDropdown
 ├── ExportImportToolbar (top right)
 ├── Legend (bottom right, draggable)
 ├── AssignmentModal (centered overlay)
-└── StateSearch (top center)
+├── StateSearch (top center)
+├── SaveMapDialog
+├── MapListModal
+└── UnsavedChangesDialog
 ```
 
 ## Key Architectural Decisions
@@ -134,6 +143,9 @@ The history stack in `useAssignments` only tracks assignment changes. Rep name/c
 | `territory-map-reps` | `{ [repId]: { name, color?, territoryName? } }` |
 | `territory-map-assignments` | `{ [stateCode]: { repName, assignedAt } }` |
 | `territory-map-panel-width` | Panel width in pixels |
+| `territory-map-saved-list` | `SavedMapMeta[]` - list of saved maps (id, name, dates, stateCount) |
+| `territory-map-saved-{id}` | Full `SavedMap` data for each map |
+| `territory-map-active-id` | Currently active map ID (or null for untitled) |
 
 ### Export Versions
 | Version | Changes |
@@ -147,6 +159,9 @@ The history stack in `useAssignments` only tracks assignment changes. Rep name/c
 |-----|--------|
 | `Cmd+Z` | Undo |
 | `Cmd+Shift+Z` | Redo |
+| `Cmd+S` | Save map |
+| `Cmd+Shift+S` | Save map as |
+| `Cmd+O` | Open map list |
 | `/` | Focus search |
 | `Escape` | Close modals |
 
@@ -180,3 +195,12 @@ The history stack in `useAssignments` only tracks assignment changes. Rep name/c
 2. Refresh - width should persist
 3. Toggle panel open/close
 4. Verify map fills available space correctly
+
+### After Modifying Saved Maps
+1. Create new map, assign states, save with name
+2. Create second map for different client
+3. Switch between maps, verify data loads correctly
+4. Test unsaved changes warning dialog
+5. Refresh browser, verify active map persists
+6. Delete a map, verify removed from list
+7. Test keyboard shortcuts (Cmd+S, Cmd+Shift+S, Cmd+O)

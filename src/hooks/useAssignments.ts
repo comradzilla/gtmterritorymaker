@@ -21,12 +21,14 @@ export interface UseAssignmentsReturn {
   updateRepName: (oldName: string, newName: string) => void
   clearAll: () => void
   importAssignments: (data: TerritoryAssignments) => void
+  resetToData: (data: TerritoryAssignments) => void
   undo: () => void
   redo: () => void
   canUndo: boolean
   canRedo: boolean
   lastSaved: Date | null
   isDirty: boolean
+  markClean: () => void
 }
 
 function loadFromStorage(): TerritoryAssignments {
@@ -191,6 +193,24 @@ export function useAssignments(): UseAssignmentsReturn {
     [pushState]
   )
 
+  // Reset to specific data (for loading saved maps) - clears history
+  const resetToData = useCallback((data: TerritoryAssignments) => {
+    setHistory({
+      past: [],
+      present: data,
+      future: [],
+    })
+    saveToStorage(data)
+    setLastSaved(new Date())
+    setIsDirty(false)
+  }, [])
+
+  // Mark current state as clean (after saving to a map)
+  const markClean = useCallback(() => {
+    setIsDirty(false)
+    setLastSaved(new Date())
+  }, [])
+
   const undo = useCallback(() => {
     setHistory((prev) => {
       if (prev.past.length === 0) return prev
@@ -226,11 +246,13 @@ export function useAssignments(): UseAssignmentsReturn {
     updateRepName,
     clearAll,
     importAssignments,
+    resetToData,
     undo,
     redo,
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     lastSaved,
     isDirty,
+    markClean,
   }
 }

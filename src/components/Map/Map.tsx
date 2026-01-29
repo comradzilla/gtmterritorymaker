@@ -3,18 +3,24 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import StateLayer from './StateLayer'
 import StateLabels from './StateLabels'
 import AssignmentModal from '../AssignmentModal'
+import ImportModal from '../ImportModal'
 import Legend from '../Legend'
 import SlideOutPanel from '../SlideOutPanel'
 import ResizeHandle from '../ResizeHandle'
 import ExportImportToolbar from '../ExportImportToolbar'
 import StateSearch, { type StateSearchHandle } from '../StateSearch'
+import SaveMapDialog from '../SaveMapDialog'
+import UnsavedChangesDialog from '../UnsavedChangesDialog'
+import MapListModal from '../MapListModal'
 import { useGeoJson } from '../../hooks/useGeoJson'
 import { useReps } from '../../hooks/useReps'
 import { useAssignments } from '../../hooks/useAssignments'
+import { useSavedMaps } from '../../hooks/useSavedMaps'
 import { useKeyboardShortcuts, createShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { usePanelResize } from '../../hooks/usePanelResize'
 import { getCentroidsLookup } from '../../data/stateCentroids'
-import type { SelectedState } from '../../types'
+import type { SelectedState, TerritoryAssignments } from '../../types'
+import type { StoredRepData } from '../../types/savedMaps'
 
 const CARTO_TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
 const CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -34,7 +40,7 @@ function MapController({ onMapReady }: MapControllerProps): null {
 
 function Map() {
   const { data, loading, error, lookupMaps } = useGeoJson()
-  const { reps, repColors, updateRepName, updateRepColor, updateRepTerritory } = useReps()
+  const { reps, repColors, updateRepName, updateRepColor, updateRepTerritory, importReps, resetToData, getStoredRepData } = useReps()
   const {
     assignments,
     setAssignment,
@@ -42,18 +48,57 @@ function Map() {
     syncRepAssignments,
     updateRepName: updateRepNameInAssignments,
     importAssignments,
+    resetToData: resetAssignments,
+    clearAll,
     undo,
     redo,
     canUndo,
     canRedo,
     lastSaved,
     isDirty,
+    markClean,
   } = useAssignments()
+
+  // Load map handler - resets both reps and assignments
+  const handleLoadMap = useCallback(
+    (newReps: StoredRepData, newAssignments: TerritoryAssignments) => {
+      resetToData(newReps)
+      resetAssignments(newAssignments)
+    },
+    [resetToData, resetAssignments]
+  )
+
+  // Saved maps hook
+  const {
+    savedMaps,
+    activeMapId,
+    activeMapName,
+    hasUnsavedChanges,
+    saveCurrentMap,
+    saveAsNewMap,
+    loadMap,
+    createNewMap,
+    deleteMap,
+    renameMap,
+  } = useSavedMaps({
+    reps: getStoredRepData(),
+    assignments,
+    isDirty,
+    onLoadMap: handleLoadMap,
+    onMarkClean: markClean,
+  })
+
+  // Saved maps dialog states
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [showMapListModal, setShowMapListModal] = useState(false)
+  const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
+  const [pendingAction, setPendingAction] = useState<{ type: 'load' | 'new'; mapId?: string } | null>(null)
 
   const [selectedState, setSelectedState] = useState<SelectedState | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(true)
   const [showLabels, setShowLabels] = useState(false)
   const [showLegend, setShowLegend] = useState(true)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   // Panel resize hook
   const { width: panelWidth, isResizing, startResize } = usePanelResize()
@@ -111,6 +156,85 @@ function Map() {
     mapRef.current = map
   }, [])
 
+  const handleCSVImport = useCallback((
+    newAssignments: Record<string, { repName: string; assignedAt: string }>,
+    repNames: string[],
+    mode: 'replace' | 'merge'
+  ) => {
+    if (mode === 'replace') {
+      // Clear and replace
+      clearAll()
+      importReps(repNames)
+    }
+    // Import assignments (merge mode just adds on top of existing)
+    importAssignments(newAssignments)
+  }, [clearAll, importReps, importAssignments])
+
+  // Save handlers
+  const handleSave = useCallback(() => {
+    if (activeMapId) {
+      saveCurrentMap()
+    } else {
+      setShowSaveDialog(true)
+    }
+  }, [activeMapId, saveCurrentMap])
+
+  const handleSaveAs = useCallback(() => {
+    setShowSaveDialog(true)
+  }, [])
+
+  const handleSaveDialogConfirm = useCallback((name: string) => {
+    saveAsNewMap(name)
+    setShowSaveDialog(false)
+  }, [saveAsNewMap])
+
+  // Load handlers with unsaved changes check
+  const handleLoadMapWithCheck = useCallback((mapId: string) => {
+    if (hasUnsavedChanges) {
+      setPendingAction({ type: 'load', mapId })
+      setShowUnsavedChangesDialog(true)
+    } else {
+      loadMap(mapId)
+    }
+  }, [hasUnsavedChanges, loadMap])
+
+  const handleNewMapWithCheck = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setPendingAction({ type: 'new' })
+      setShowUnsavedChangesDialog(true)
+    } else {
+      createNewMap()
+    }
+  }, [hasUnsavedChanges, createNewMap])
+
+  const handleUnsavedSaveAndSwitch = useCallback(() => {
+    if (activeMapId) {
+      saveCurrentMap()
+    }
+    if (pendingAction?.type === 'load' && pendingAction.mapId) {
+      loadMap(pendingAction.mapId)
+    } else if (pendingAction?.type === 'new') {
+      createNewMap()
+    }
+    setShowUnsavedChangesDialog(false)
+    setPendingAction(null)
+  }, [activeMapId, saveCurrentMap, loadMap, createNewMap, pendingAction])
+
+  const handleUnsavedSwitchWithoutSaving = useCallback(() => {
+    if (pendingAction?.type === 'load' && pendingAction.mapId) {
+      loadMap(pendingAction.mapId)
+    } else if (pendingAction?.type === 'new') {
+      createNewMap()
+    }
+    setShowUnsavedChangesDialog(false)
+    setPendingAction(null)
+  }, [loadMap, createNewMap, pendingAction])
+
+  const handleUnsavedCancel = useCallback(() => {
+    setShowUnsavedChangesDialog(false)
+    setPendingAction(null)
+  }, [])
+
   // Keyboard shortcuts
   const shortcuts = useMemo(
     () =>
@@ -124,8 +248,11 @@ function Map() {
         onSearch: () => {
           searchRef.current?.focus()
         },
+        onSave: handleSave,
+        onSaveAs: handleSaveAs,
+        onOpenMaps: () => setShowMapListModal(true),
       }),
-    [canUndo, canRedo, undo, redo]
+    [canUndo, canRedo, undo, redo, handleSave, handleSaveAs]
   )
 
   useKeyboardShortcuts(shortcuts)
@@ -160,6 +287,15 @@ function Map() {
               onUpdateRepNameInAssignments={updateRepNameInAssignments}
               onSyncRepAssignments={syncRepAssignments}
               lookupMaps={lookupMaps}
+              activeMapName={activeMapName}
+              activeMapId={activeMapId}
+              hasUnsavedChanges={hasUnsavedChanges}
+              savedMaps={savedMaps}
+              onSave={handleSave}
+              onSaveAs={handleSaveAs}
+              onNewMap={handleNewMapWithCheck}
+              onOpenMapList={() => setShowMapListModal(true)}
+              onLoadMap={handleLoadMapWithCheck}
             />
           </div>
 
@@ -204,6 +340,7 @@ function Map() {
           repColors={repColors}
           codeToName={lookupMaps.codeToName}
           onImport={importAssignments}
+          onOpenImportCSV={() => setIsImportModalOpen(true)}
           onUndo={undo}
           onRedo={redo}
           canUndo={canUndo}
@@ -278,6 +415,43 @@ function Map() {
             onClose={handleCloseModal}
           />
         )}
+
+        {/* Import Modal */}
+        <ImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={handleCSVImport}
+          lookupMaps={lookupMaps}
+        />
+
+        {/* Save Map Dialog */}
+        <SaveMapDialog
+          isOpen={showSaveDialog}
+          title={activeMapId ? 'Save Map As' : 'Save Map'}
+          initialName={activeMapName || ''}
+          confirmLabel="Save"
+          onConfirm={handleSaveDialogConfirm}
+          onCancel={() => setShowSaveDialog(false)}
+        />
+
+        {/* Map List Modal */}
+        <MapListModal
+          isOpen={showMapListModal}
+          savedMaps={savedMaps}
+          activeMapId={activeMapId}
+          onLoad={handleLoadMapWithCheck}
+          onDelete={deleteMap}
+          onRename={renameMap}
+          onClose={() => setShowMapListModal(false)}
+        />
+
+        {/* Unsaved Changes Dialog */}
+        <UnsavedChangesDialog
+          isOpen={showUnsavedChangesDialog}
+          onSaveAndSwitch={handleUnsavedSaveAndSwitch}
+          onSwitchWithoutSaving={handleUnsavedSwitchWithoutSaving}
+          onCancel={handleUnsavedCancel}
+        />
       </div>
     </div>
   )

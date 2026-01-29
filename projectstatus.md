@@ -40,13 +40,21 @@ A React-based territory mapping application for sales team management. Allows as
 - One-click assign/reassign to any rep
 - Remove assignment option
 
-### Data Persistence + Export (NEW)
+### Data Persistence + Export
 - [x] Save assignments to localStorage (auto-save with debounce)
 - [x] Export assignments as JSON
 - [x] Export assignments as CSV
 - [x] Import assignments from JSON
 
-### UX Enhancements (NEW)
+### Saved Maps Feature (NEW)
+- [x] Save multiple named maps (e.g., "Acme Corp", "Q1 2025")
+- [x] Load and switch between saved maps
+- [x] Unsaved changes warning when switching
+- [x] Map list modal with search and sort
+- [x] Keyboard shortcuts: Cmd+S (save), Cmd+Shift+S (save as), Cmd+O (open)
+- [x] Auto-migration of existing data to "Default Map"
+
+### UX Enhancements
 - [x] Undo/redo functionality (Cmd+Z / Cmd+Shift+Z)
 - [x] State search with autocomplete (press `/` to focus)
 - [x] Keyboard shortcuts (Escape to close modals)
@@ -70,28 +78,35 @@ A React-based territory mapping application for sales team management. Allows as
 src/
 ├── components/
 │   ├── Map/
-│   │   ├── Map.tsx              # Main container
+│   │   ├── Map.tsx              # Main container + saved maps integration
 │   │   ├── StateLayer.tsx       # GeoJSON polygon rendering
 │   │   └── StateLabels.tsx      # State abbreviations with leader lines
 │   ├── AssignmentModal.tsx      # Single state assignment
 │   ├── Legend.tsx               # Territory summary
-│   ├── SlideOutPanel.tsx        # Bulk assign + rep management
+│   ├── SlideOutPanel.tsx        # Bulk assign + rep management + saved maps dropdown
 │   ├── ExportImportToolbar.tsx  # Unified toolbar (undo/redo, export, import, labels, zoom)
 │   ├── StateSearch.tsx          # Search autocomplete with flyTo
-│   └── ConfirmationDialog.tsx   # Reusable confirmation modal
+│   ├── ConfirmationDialog.tsx   # Reusable confirmation modal
+│   ├── SavedMapsDropdown.tsx    # Dropdown menu for save/load/new map (NEW)
+│   ├── SaveMapDialog.tsx        # Dialog for entering map name (NEW)
+│   ├── MapListModal.tsx         # Full modal showing all saved maps (NEW)
+│   └── UnsavedChangesDialog.tsx # Warning dialog for unsaved changes (NEW)
 ├── hooks/
 │   ├── useGeoJson.ts            # Fetches map data + lookup maps
-│   ├── useReps.ts               # Rep management + localStorage
-│   ├── useAssignments.ts        # Assignment state + persistence + history
-│   └── useKeyboardShortcuts.ts  # Global keyboard shortcuts
+│   ├── useReps.ts               # Rep management + localStorage + resetToData
+│   ├── useAssignments.ts        # Assignment state + persistence + history + resetToData
+│   ├── useKeyboardShortcuts.ts  # Global keyboard shortcuts (save, save as, open)
+│   └── useSavedMaps.ts          # Saved maps state management (NEW)
 ├── utils/
 │   ├── exportUtils.ts           # JSON/CSV export utilities
-│   └── mapExporter.ts           # Image export with html-to-image
+│   ├── mapExporter.ts           # Image export with leaflet-image
+│   └── savedMapsStorage.ts      # localStorage CRUD for saved maps (NEW)
 ├── data/
 │   ├── reps.ts                  # Sales rep definitions
 │   └── stateCentroids.ts        # State centroids + small state offsets
 └── types/
-    └── index.ts                 # TypeScript interfaces
+    ├── index.ts                 # TypeScript interfaces
+    └── savedMaps.ts             # SavedMap, SavedMapMeta types (NEW)
 ```
 
 ---
@@ -100,10 +115,11 @@ src/
 
 1. **State Codes:** Using 2-letter codes (CA, TX, NY) as primary identifiers
 2. **Small States:** RI, DE, DC, CT, NJ, NH, VT, MA, MD get external labels with leader lines over the Atlantic
-3. **Map Export:** Using `html-to-image` library for DOM capture with canvas compositing for legend
+3. **Map Export:** Using `leaflet-image` library for capture with canvas compositing for polygons/labels/legend
 4. **Centroid Data:** Pre-calculated centroids stored in `stateCentroids.ts`
 5. **History:** Stack-based undo/redo with 50-entry limit, debounced auto-save (300ms)
-6. **Keyboard Shortcuts:** Escape closes modals, Cmd+Z/Cmd+Shift+Z for undo/redo, `/` focuses search
+6. **Keyboard Shortcuts:** Escape closes modals, Cmd+Z/Cmd+Shift+Z for undo/redo, `/` focuses search, Cmd+S save, Cmd+Shift+S save as, Cmd+O open maps
+7. **Saved Maps:** Multiple maps stored in localStorage with separate keys per map, metadata list for quick loading
 
 ---
 
@@ -339,6 +355,54 @@ src/
   - `src/utils/exportUtils.ts` - Updated JSON/CSV export to use rep territories, version 2.0
   - `src/components/ExportImportToolbar.tsx` - Pass `reps` to CSV export
   - `src/components/Map/Map.tsx` - Updated props (added `onUpdateRepTerritory`, removed territory from assignment handlers)
+  - Build verified clean
+
+### Session 19
+- Saved Maps Feature (Phase 19):
+
+  **Core Functionality**
+  - Save multiple named maps (e.g., "Acme Corp", "Q1 2025")
+  - Load and switch between saved maps
+  - Unsaved changes detection with warning dialog
+  - Auto-migration: existing data becomes "Default Map" on first load
+
+  **UI Components**
+  - `SavedMapsDropdown` - Dropdown in panel header with Save, Save As, New, Open, recent maps
+  - `SaveMapDialog` - Simple dialog for entering map name
+  - `MapListModal` - Full modal with search, sort by name/date/state count, rename, delete
+  - `UnsavedChangesDialog` - "Save & Switch" / "Don't Save" / "Cancel" options
+
+  **Data Model**
+  - `SavedMapMeta` - Lightweight metadata: id, name, dates, stateCount (for list display)
+  - `SavedMap` - Full data: id, name, dates, reps (StoredRepData), assignments (TerritoryAssignments)
+  - localStorage keys: `territory-map-saved-list`, `territory-map-saved-{id}`, `territory-map-active-id`
+
+  **Hook Changes**
+  - `useAssignments` - Added `resetToData()` and `markClean()` methods
+  - `useReps` - Added `resetToData()` and `getStoredRepData()` methods
+  - `useSavedMaps` - New hook managing saved maps state and actions
+
+  **Keyboard Shortcuts**
+  - `Cmd+S` - Save (prompts for name if untitled)
+  - `Cmd+Shift+S` - Save As (always prompts for name)
+  - `Cmd+O` - Open map list modal
+
+  **Files Created:**
+  - `src/types/savedMaps.ts`
+  - `src/utils/savedMapsStorage.ts`
+  - `src/hooks/useSavedMaps.ts`
+  - `src/components/SavedMapsDropdown.tsx`
+  - `src/components/SaveMapDialog.tsx`
+  - `src/components/MapListModal.tsx`
+  - `src/components/UnsavedChangesDialog.tsx`
+
+  **Files Modified:**
+  - `src/hooks/useAssignments.ts` - Added resetToData, markClean
+  - `src/hooks/useReps.ts` - Added resetToData, getStoredRepData
+  - `src/hooks/useKeyboardShortcuts.ts` - Added save/open shortcuts
+  - `src/components/Map/Map.tsx` - Integrated useSavedMaps and dialogs
+  - `src/components/SlideOutPanel.tsx` - Added SavedMapsDropdown to header
+  - `CLAUDE.md` - Updated documentation
   - Build verified clean
 
 ---

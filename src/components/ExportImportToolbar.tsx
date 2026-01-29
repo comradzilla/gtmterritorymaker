@@ -67,6 +67,7 @@ interface ExportImportToolbarProps {
   repColors: RepColors
   codeToName: Record<string, string>
   onImport: (data: TerritoryAssignments) => void
+  onOpenImportCSV: () => void
   onUndo: () => void
   onRedo: () => void
   canUndo: boolean
@@ -87,6 +88,7 @@ function ExportImportToolbar({
   repColors,
   codeToName,
   onImport,
+  onOpenImportCSV,
   onUndo,
   onRedo,
   canUndo,
@@ -290,13 +292,22 @@ function ExportImportToolbar({
         )}
       </div>
 
-      {/* Import */}
+      {/* Import CSV */}
+      <button
+        onClick={onOpenImportCSV}
+        className="px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100"
+        title="Import from CSV or paste data"
+      >
+        Import CSV
+      </button>
+
+      {/* Import JSON */}
       <button
         onClick={handleImportClick}
         className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
         title="Import from JSON"
       >
-        Import
+        Import JSON
       </button>
       <input
         ref={fileInputRef}
