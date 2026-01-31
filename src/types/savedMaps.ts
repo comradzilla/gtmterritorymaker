@@ -26,6 +26,7 @@ export interface SavedMap {
   modifiedAt: string
   reps: StoredRepData
   assignments: TerritoryAssignments
+  repOrder?: string[]  // Ordered rep IDs; absent in older saved maps
 }
 
 // Context for the currently active map

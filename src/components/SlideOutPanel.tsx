@@ -1,20 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import type { SalesRep } from '../data/reps'
+import { EXTENDED_COLOR_PALETTE, MAX_REPS } from '../data/reps'
 import type { StateLookupMaps } from '../hooks/useGeoJson'
 import type { TerritoryAssignments } from '../types'
 import type { SavedMapMeta } from '../types/savedMaps'
 import ConfirmationDialog from './ConfirmationDialog'
+import RemoveRepDialog from './RemoveRepDialog'
 import SavedMapsDropdown from './SavedMapsDropdown'
-
-const COLOR_PALETTE = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-]
 
 type FeedbackType = 'success' | 'error'
 
@@ -48,6 +41,10 @@ interface SlideOutPanelProps {
   onNewMap: () => void
   onOpenMapList: () => void
   onLoadMap: (id: string) => void
+  // Dynamic reps
+  onAddRep: () => void
+  onRemoveRep: (repId: string, reassignToRepName: string | null) => void
+  onClearAll: () => void
 }
 
 interface ConflictInfo {
@@ -73,6 +70,9 @@ function SlideOutPanel({
   onNewMap,
   onOpenMapList,
   onLoadMap,
+  onAddRep,
+  onRemoveRep,
+  onClearAll,
 }: SlideOutPanelProps) {
   const [statesInput, setStatesInput] = useState('')
   const [selectedRepId, setSelectedRepId] = useState('')
@@ -88,6 +88,9 @@ function SlideOutPanel({
 
   // Custom color picker state
   const [pendingCustomColor, setPendingCustomColor] = useState<string | null>(null)
+
+  // Remove rep dialog state
+  const [removeRepId, setRemoveRepId] = useState<string | null>(null)
 
   // Calculate state counts per rep
   const repCounts = useMemo(() => {
@@ -289,6 +292,21 @@ function SlideOutPanel({
     setPendingCustomColor(null)
   }
 
+  // Remove rep handlers
+  const handleTrashClick = (e: React.MouseEvent, rep: SalesRep) => {
+    e.stopPropagation()
+    const count = repCounts.get(rep.name) || 0
+    if (count > 0) {
+      setRemoveRepId(rep.id)
+    } else {
+      onRemoveRep(rep.id, null)
+    }
+  }
+
+  const removeDialogRep = removeRepId ? reps.find((r) => r.id === removeRepId) : null
+  const removeDialogCount = removeDialogRep ? (repCounts.get(removeDialogRep.name) || 0) : 0
+  const removeDialogOtherReps = removeDialogRep ? reps.filter((r) => r.id !== removeDialogRep.id) : []
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
@@ -347,7 +365,15 @@ function SlideOutPanel({
 
         {/* Manage Reps Section */}
         <div className="p-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Manage Reps</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-700">Manage Reps</h3>
+            <button
+              onClick={onClearAll}
+              className="text-xs font-medium text-red-600 hover:text-red-700"
+            >
+              Clear All
+            </button>
+          </div>
           <p className="text-xs text-gray-500 mb-2">Click row to select, pencil to edit name</p>
 
           {/* Column headers */}
@@ -358,6 +384,7 @@ function SlideOutPanel({
             <span className="w-6 text-center">#</span>
             <span className="mx-1"></span>
             <span className="w-28">Territory</span>
+            <span className="w-6"></span>{/* delete column */}
           </div>
 
           <div className="space-y-1">
@@ -396,7 +423,7 @@ function SlideOutPanel({
                       className="flex-1 px-2 py-0.5 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   ) : (
-                    <span className="flex-1 text-sm text-gray-900 truncate">{rep.name}</span>
+                    <span className="flex-1 text-sm text-gray-900 truncate">{rep.name || <span className="italic text-gray-400">Unnamed</span>}</span>
                   )}
 
                   {/* Pencil icon for name edit */}
@@ -445,12 +472,23 @@ function SlideOutPanel({
                       {rep.territoryName || '—'}
                     </span>
                   )}
+
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => handleTrashClick(e, rep)}
+                    className="w-6 flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors"
+                    title="Remove rep"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
 
                 {/* Color toolbar - shown below row when picker is open */}
                 {colorPickerRepId === rep.id && (
-                  <div className="flex items-center gap-1.5 px-6 py-2 bg-gray-50 rounded-b-md border-t border-gray-100">
-                    {COLOR_PALETTE.map((color) => (
+                  <div className="flex flex-wrap items-center gap-1.5 px-6 py-2 bg-gray-50 rounded-b-md border-t border-gray-100">
+                    {EXTENDED_COLOR_PALETTE.map((color) => (
                       <button
                         key={color}
                         onClick={(e) => {
@@ -505,6 +543,16 @@ function SlideOutPanel({
               </div>
             ))}
           </div>
+
+          {/* Add Rep button */}
+          {reps.length < MAX_REPS && (
+            <button
+              onClick={onAddRep}
+              className="mt-3 w-full py-2 text-sm font-medium text-gray-500 border-2 border-dashed border-gray-300 rounded-md hover:border-blue-400 hover:text-blue-600 transition-colors"
+            >
+              + Add Rep
+            </button>
+          )}
         </div>
       </div>
 
@@ -523,6 +571,23 @@ function SlideOutPanel({
         onConfirm={handleConfirmReassign}
         onCancel={handleCancelReassign}
       />
+
+      {/* Remove Rep Dialog */}
+      {removeDialogRep && (
+        <RemoveRepDialog
+          isOpen={!!removeRepId}
+          rep={removeDialogRep}
+          stateCount={removeDialogCount}
+          otherReps={removeDialogOtherReps}
+          onConfirm={(reassignTo) => {
+            onRemoveRep(removeDialogRep.id, reassignTo)
+            setRemoveRepId(null)
+            // Clear selection if removing the selected rep
+            if (selectedRepId === removeDialogRep.id) setSelectedRepId('')
+          }}
+          onCancel={() => setRemoveRepId(null)}
+        />
+      )}
     </div>
   )
 }

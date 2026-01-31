@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { SALES_REPS } from '../data/reps'
 import type { SavedMap, SavedMapMeta, StoredRepData } from '../types/savedMaps'
 import type { TerritoryAssignments } from '../types'
 import {
@@ -15,9 +16,10 @@ import {
 
 export interface UseSavedMapsProps {
   reps: StoredRepData
+  repOrder: string[]
   assignments: TerritoryAssignments
   isDirty: boolean
-  onLoadMap: (reps: StoredRepData, assignments: TerritoryAssignments) => void
+  onLoadMap: (reps: StoredRepData, assignments: TerritoryAssignments, repOrder?: string[]) => void
   onMarkClean: () => void
 }
 
@@ -42,6 +44,7 @@ export interface UseSavedMapsReturn {
 
 export function useSavedMaps({
   reps,
+  repOrder,
   assignments,
   isDirty,
   onLoadMap,
@@ -86,24 +89,25 @@ export function useSavedMaps({
       activeMapName || 'Untitled Map',
       reps,
       assignments,
-      activeMapId
+      activeMapId,
+      repOrder
     )
     saveSavedMap(map)
     setSavedMaps(loadSavedMapsList())
     onMarkClean()
-  }, [activeMapId, activeMapName, reps, assignments, onMarkClean])
+  }, [activeMapId, activeMapName, reps, assignments, repOrder, onMarkClean])
 
   // Save as a new map with a given name
   const saveAsNewMap = useCallback(
     (name: string) => {
-      const map = createSavedMapFromState(name, reps, assignments)
+      const map = createSavedMapFromState(name, reps, assignments, undefined, repOrder)
       saveSavedMap(map)
       setActiveMapIdState(map.id)
       setActiveMapId(map.id)
       setSavedMaps(loadSavedMapsList())
       onMarkClean()
     },
-    [reps, assignments, onMarkClean]
+    [reps, repOrder, assignments, onMarkClean]
   )
 
   // Load a saved map
@@ -112,7 +116,7 @@ export function useSavedMaps({
       const map = loadSavedMap(id)
       if (!map) return false
 
-      onLoadMap(map.reps, map.assignments)
+      onLoadMap(map.reps, map.assignments, map.repOrder)
       setActiveMapIdState(id)
       setActiveMapId(id)
       return true
@@ -122,10 +126,14 @@ export function useSavedMaps({
 
   // Create a new blank map
   const createNewMap = useCallback(() => {
-    // Clear current state to defaults
+    // Reset to 6 default reps with no assignments
     const defaultReps: StoredRepData = {}
+    SALES_REPS.forEach((rep) => {
+      defaultReps[rep.id] = { name: rep.name, color: rep.color }
+    })
     const defaultAssignments: TerritoryAssignments = {}
-    onLoadMap(defaultReps, defaultAssignments)
+    const defaultOrder = SALES_REPS.map((r) => r.id)
+    onLoadMap(defaultReps, defaultAssignments, defaultOrder)
     setActiveMapIdState(null)
     setActiveMapId(null)
   }, [onLoadMap])

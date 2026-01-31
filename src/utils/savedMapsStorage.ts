@@ -112,7 +112,8 @@ export function createSavedMapFromState(
   name: string,
   reps: StoredRepData,
   assignments: TerritoryAssignments,
-  existingId?: string
+  existingId?: string,
+  repOrder?: string[]
 ): SavedMap {
   const now = new Date().toISOString()
   return {
@@ -122,6 +123,7 @@ export function createSavedMapFromState(
     modifiedAt: now,
     reps,
     assignments,
+    repOrder,
   }
 }
 

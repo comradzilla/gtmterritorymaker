@@ -40,7 +40,7 @@ function MapController({ onMapReady }: MapControllerProps): null {
 
 function Map() {
   const { data, loading, error, lookupMaps } = useGeoJson()
-  const { reps, repColors, updateRepName, updateRepColor, updateRepTerritory, importReps, resetToData, getStoredRepData } = useReps()
+  const { reps, repColors, updateRepName, updateRepColor, updateRepTerritory, importReps, resetToData, getStoredRepData, getRepOrder, addRep, removeRep, clearAllReps } = useReps()
   const {
     assignments,
     setAssignment,
@@ -61,12 +61,40 @@ function Map() {
 
   // Load map handler - resets both reps and assignments
   const handleLoadMap = useCallback(
-    (newReps: StoredRepData, newAssignments: TerritoryAssignments) => {
-      resetToData(newReps)
+    (newReps: StoredRepData, newAssignments: TerritoryAssignments, repOrder?: string[]) => {
+      resetToData(newReps, repOrder)
       resetAssignments(newAssignments)
     },
     [resetToData, resetAssignments]
   )
+
+  // Dynamic rep handlers
+  const handleAddRep = useCallback(() => { addRep() }, [addRep])
+
+  const handleRemoveRep = useCallback((repId: string, reassignToRepName: string | null) => {
+    const rep = reps.find((r) => r.id === repId)
+    if (!rep) return
+
+    if (reassignToRepName) {
+      // Transfer all states from removed rep to the target rep
+      const stateCodes = Object.entries(assignments)
+        .filter(([, a]) => a.repName === rep.name)
+        .map(([code]) => code)
+      // Get current states of target rep
+      const targetCodes = Object.entries(assignments)
+        .filter(([, a]) => a.repName === reassignToRepName)
+        .map(([code]) => code)
+      syncRepAssignments(reassignToRepName, [...targetCodes, ...stateCodes])
+    }
+    // Unassign all states from removed rep
+    syncRepAssignments(rep.name, [])
+    removeRep(repId)
+  }, [reps, assignments, syncRepAssignments, removeRep])
+
+  const handleClearAll = useCallback(() => {
+    clearAll()
+    clearAllReps()
+  }, [clearAll, clearAllReps])
 
   // Saved maps hook
   const {
@@ -82,6 +110,7 @@ function Map() {
     renameMap,
   } = useSavedMaps({
     reps: getStoredRepData(),
+    repOrder: getRepOrder(),
     assignments,
     isDirty,
     onLoadMap: handleLoadMap,
@@ -296,6 +325,9 @@ function Map() {
               onNewMap={handleNewMapWithCheck}
               onOpenMapList={() => setShowMapListModal(true)}
               onLoadMap={handleLoadMapWithCheck}
+              onAddRep={handleAddRep}
+              onRemoveRep={handleRemoveRep}
+              onClearAll={handleClearAll}
             />
           </div>
 
