@@ -37,7 +37,8 @@ Map.tsx (orchestrator)
 │   ├── StateLayer (GeoJSON polygons)
 │   └── StateLabels (DivIcon markers)
 ├── SlideOutPanel (left side)
-│   └── SavedMapsDropdown
+│   ├── SavedMapsDropdown
+│   └── RemoveRepDialog (modal, on delete rep with states)
 ├── ExportImportToolbar (top right)
 ├── Legend (bottom right, draggable)
 ├── AssignmentModal (centered overlay)
@@ -87,6 +88,22 @@ Map.tsx (orchestrator)
 
 **Files:** `SlideOutPanel.tsx` - `pendingCustomColor` state
 
+### 6. Dynamic Reps with Storage Migration
+**Decision:** Reps are stored in V2 format `{ version: 2, reps: SalesRep[] }` as an ordered array. Old V1 format (keyed object `rep1`–`rep6`) is auto-migrated on load.
+
+**Why:** The original fixed 6-rep system used a keyed object. Dynamic add/remove requires an ordered array to support arbitrary rep counts and preserve ordering. V2 format stores the full array directly.
+
+**Impact:** Rep IDs are generated via a localStorage counter (`territory-map-rep-id-counter`) starting at 7 to avoid collisions with legacy `rep1`–`rep6` IDs. Saved maps now include an optional `repOrder: string[]` field for ordering preservation; older saved maps without it fall back to `Object.keys(reps)`.
+
+**Files:** `src/data/reps.ts` (palette, MAX_REPS, ID gen), `src/hooks/useReps.ts` (V2 storage, add/remove/clear), `src/components/RemoveRepDialog.tsx`
+
+### 7. Remove Rep with Reassignment
+**Decision:** When removing a rep that has assigned states, a `RemoveRepDialog` appears with options to unassign all states or reassign them to another rep.
+
+**Why:** Prevents accidental data loss. Users need explicit control over what happens to assigned states when a rep is deleted.
+
+**Files:** `src/components/RemoveRepDialog.tsx`, `src/components/Map/Map.tsx` (`handleRemoveRep`)
+
 ## Potential Pitfalls
 
 ### 1. Leaflet z-index Conflicts
@@ -122,13 +139,15 @@ User input is normalized to uppercase, but internally always use uppercase codes
 ### 6. Undo/Redo Only Tracks Assignments
 The history stack in `useAssignments` only tracks assignment changes. Rep name/color changes are NOT undoable.
 
+### 7. Rep ID Counter in localStorage
+`generateRepId()` uses `territory-map-rep-id-counter` (starts at 7) to create unique IDs. This counter only increments, never resets, so IDs are never reused even after deleting reps. If the counter key is missing it re-initializes at 7.
+
 ## Current Gaps
 
 ### Not Implemented
-- **Add/remove reps dynamically** - Currently fixed 6 reps defined in `src/data/reps.ts`
 - **Mobile responsive** - Panel doesn't collapse properly on small screens
 - **Multi-select states** - Can only assign one state at a time via modal (bulk via text input works)
-- **Drag-and-drop rep reordering** - Rep order is fixed
+- **Drag-and-drop rep reordering** - Rep order is fixed (add order only)
 - **Territory sharing** - One territory per rep only
 
 ### Known Bugs
@@ -140,11 +159,12 @@ The history stack in `useAssignments` only tracks assignment changes. Rep name/c
 ### localStorage Keys
 | Key | Contents |
 |-----|----------|
-| `territory-map-reps` | `{ [repId]: { name, color?, territoryName? } }` |
+| `territory-map-reps` | V2: `{ version: 2, reps: SalesRep[] }` (auto-migrates V1 keyed object) |
 | `territory-map-assignments` | `{ [stateCode]: { repName, assignedAt } }` |
 | `territory-map-panel-width` | Panel width in pixels |
+| `territory-map-rep-id-counter` | Auto-incrementing integer for generating unique rep IDs (starts at 7) |
 | `territory-map-saved-list` | `SavedMapMeta[]` - list of saved maps (id, name, dates, stateCount) |
-| `territory-map-saved-{id}` | Full `SavedMap` data for each map |
+| `territory-map-saved-{id}` | Full `SavedMap` data for each map (now includes optional `repOrder`) |
 | `territory-map-active-id` | Currently active map ID (or null for untitled) |
 
 ### Export Versions
@@ -165,15 +185,20 @@ The history stack in `useAssignments` only tracks assignment changes. Rep name/c
 | `/` | Focus search |
 | `Escape` | Close modals |
 
-### Color Palette (6 core colors)
+### Color Palette (20 extended colors)
+First 6 are the original core colors. Defined in `EXTENDED_COLOR_PALETTE` in `src/data/reps.ts`.
 ```
-#3B82F6 Blue
-#10B981 Green
-#F59E0B Amber
-#EF4444 Red
-#8B5CF6 Purple
-#EC4899 Pink
+#3B82F6 Blue       #10B981 Green      #F59E0B Amber      #EF4444 Red
+#8B5CF6 Purple     #EC4899 Pink       #14B8A6 Teal       #F97316 Orange
+#6366F1 Indigo     #84CC16 Lime       #06B6D4 Cyan       #E11D48 Rose
+#A855F7 Violet     #0EA5E9 Sky        #D946EF Fuchsia    #22C55E Emerald
+#FACC15 Yellow     #78716C Stone      #64748B Slate      #F43F5E Coral
 ```
+
+### Rep Limits
+- **Soft cap:** 20 reps (`MAX_REPS` in `src/data/reps.ts`)
+- **Default:** 6 named reps (Alice, Bob, Carol, David, Eva, Frank)
+- **"Clear All"** resets to the 6 defaults with no assignments
 
 ## Testing Changes
 
@@ -204,3 +229,13 @@ The history stack in `useAssignments` only tracks assignment changes. Rep name/c
 5. Refresh browser, verify active map persists
 6. Delete a map, verify removed from list
 7. Test keyboard shortcuts (Cmd+S, Cmd+Shift+S, Cmd+O)
+
+### After Modifying Dynamic Reps
+1. Click "+ Add Rep" multiple times — verify new rows appear with blank names and unique colors, cap at 20
+2. Click trash on unassigned rep — should disappear immediately
+3. Assign states to a rep, click trash — dialog should appear with reassign options. Test both "unassign" and "reassign to X"
+4. Click "Clear All" — should reset to 6 default reps with no assignments
+5. Save a map with 10+ reps, load it — verify all reps load with correct colors, names, and assignments
+6. Refresh browser — verify dynamically added reps persist (V2 storage)
+7. Clear localStorage `territory-map-reps`, refresh — verify V1 migration or fresh defaults load correctly
+8. Import CSV with more than 6 rep names — verify dynamic rep creation
